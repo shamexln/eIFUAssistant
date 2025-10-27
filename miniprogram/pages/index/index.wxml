@@ -1,0 +1,55 @@
+<view class="container">
+  <!-- A: 扫码页面 -->
+  <view class="section">
+    <button class="btn" type="primary" bindtap="onScan">扫码定位设备说明书</button>
+    <view class="tip">设备型号：{{deviceModel || '—'}} </view>
+    <view class="tip">说明书路径：{{ifuPath || '—'}}</view>
+  </view>
+
+  <!-- B: 关键词搜索页 -->
+  <view class="section">
+    <text class="label">关键词搜索</text>
+    <input class="input" placeholder="请输入关键词" bindinput="onKeywordInput" />
+    <button class="btn" bindtap="onSearchIFU">搜索</button>
+  </view>
+
+  <view class="section" wx:if="{{results.length}}">
+    <text class="label">搜索结果</text>
+    <block wx:for="{{results}}" wx:key="index">
+      <view class="result-item" bindtap="onViewDetail" data-doc="{{item.doc}}" data-page="{{item.page}}">
+        <text class="doc">{{item.doc}} - 第{{item.page}}页</text>
+        <text class="snippet">{{item.snippet}}</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- C: 内容详情页（简化为浮层展示） -->
+  <view class="detail-mask" wx:if="{{showDetail}}" bindtap="closeDetail">
+    <view class="detail" catchtap="true">
+      <view class="detail-title">内容详情</view>
+      <scroll-view scroll-y="true" style="max-height: 50vh;">
+        <text>{{detailContent}}</text>
+      </scroll-view>
+      <button class="btn" bindtap="closeDetail">关闭</button>
+    </view>
+  </view>
+
+  <!-- 原有 Gaia 演示 -->
+  <view class="divider" />
+  <view class="section">
+    <text class="label">系统提示词（可选）</text>
+    <textarea class="input" placeholder="例如：你是一个有帮助的助手" auto-height bindinput="onSystemPromptInput" />
+  </view>
+
+  <view class="section">
+    <text class="label">输入你的问题</text>
+    <textarea class="input" placeholder="请输入内容" auto-height bindinput="onTextInput" />
+  </view>
+
+  <button class="btn" type="primary" loading="{{loading}}" bindtap="onSubmit" disabled="{{loading}}">发送</button>
+
+  <view class="section">
+    <text class="label">回复</text>
+    <view class="output">{{response}}</view>
+  </view>
+</view>

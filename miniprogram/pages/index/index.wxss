@@ -1,0 +1,31 @@
+page {
+  background: #f7f7f7;
+}
+.container {
+  padding: 16rpx 24rpx 80rpx;
+}
+.section { margin-bottom: 24rpx; }
+.label { color: #666; font-size: 26rpx; margin-bottom: 12rpx; display: block; }
+.input {
+  background: #fff;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  min-height: 80rpx;
+  border: 1px solid #eee;
+}
+.btn { margin-top: 12rpx; }
+.output {
+  white-space: pre-wrap;
+  background: #fff;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  min-height: 160rpx;
+  border: 1px solid #eee;
+}
+.tip { color: #888; font-size: 24rpx; margin-top: 8rpx; }
+.result-item { background: #fff; padding: 16rpx; border-radius: 12rpx; margin-top: 12rpx; border: 1px solid #eee; }
+.result-item .doc { display: block; font-weight: 600; color: #333; }
+.result-item .snippet { display: block; color: #666; margin-top: 6rpx; }
+.detail-mask { position: fixed; left:0; top:0; right:0; bottom:0; background: rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index: 999; }
+.detail { width: 86vw; max-width: 640rpx; background: #fff; border-radius: 16rpx; padding: 20rpx; }
+.divider { height: 1px; background: #eaeaea; margin: 24rpx 0; }
