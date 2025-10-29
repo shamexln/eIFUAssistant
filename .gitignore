@@ -1,0 +1,9 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/mobile-angular/node_modules
+/mobile-angular/dist/eifu-mobile-angular
+/mobile-angular/.angular/cache/18.2.21
+/.vs
+/.idea
