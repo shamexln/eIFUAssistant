@@ -46,6 +46,7 @@ import { Result } from '@zxing/library';
           </div>
         </mat-card-content>
         <mat-card-actions>
+          <button mat-raised-button color="primary" (click)="goSearch()" [disabled]="!ifuPath() && !model()">去检索</button>
           <button mat-raised-button color="accent" (click)="goChat()" [disabled]="!ifuPath() && !model()">去聊天</button>
         </mat-card-actions>
       </mat-card>
@@ -131,21 +132,38 @@ export class ScanComponent implements OnDestroy {
   private async handleText(text: string) {
     // 支持几种常见形式：
     // 1) 纯型号，如 "Vista 300"
-    // 2) 带参数，如 "https://xx?q=...&model=Vista%20300" 或 "model=Vista 300"
-    // 3) 直接给出文档路径，如 "ifus/Vista_300.pdf" 或 "doc_path=ifus/Vista_300.pdf"
-    const urlMatch = /model=([^&]+)/i.exec(text);
-    const docMatch = /(?:ifu_path|doc_path)=([^&]+)/i.exec(text);
+    // 2) JSON 字符串，如 '{"model":"Vista 300"}'
+    // 3) value比如"Vista 300"去后端从_IFU_MAP获取对应的value，比如"Vista 300": "41f4f2b3-4ae1-42f3-b824-b7430ffb45c5", 中的"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"
+    // 4) 之后都是用"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5" 这个值作为ifu_path的值返回
 
     let model = '';
     let ifuPath = '';
 
-    if (docMatch) {
-      ifuPath = decodeURIComponent(docMatch[1]);
-    }
-    if (urlMatch) {
-      model = decodeURIComponent(urlMatch[1]);
+    // 优先尝试解析 JSON（二维码中常见这种结构）
+    try {
+      const maybeJson = JSON.parse(text);
+      if (maybeJson && typeof maybeJson === 'object') {
+        const obj = maybeJson as any;
+        ifuPath = String(obj.ifu_path || obj.doc_path || '').trim();
+        model = String(obj.model || '').trim();
+      }
+    } catch {
+      // 非 JSON，继续走下方的 URL/纯文本推断
     }
 
+    // 若仍未解析到，再从 URL/参数中提取
+    if (!model || !ifuPath) {
+      const urlMatch = /model=([^&]+)/i.exec(text);
+      const docMatch = /(?:ifu_path|doc_path)=([^&]+)/i.exec(text);
+      if (!ifuPath && docMatch) {
+        ifuPath = decodeURIComponent(docMatch[1]);
+      }
+      if (!model && urlMatch) {
+        model = decodeURIComponent(urlMatch[1]);
+      }
+    }
+
+    // 若还是都没有，从原始文本判断是型号还是文档路径
     if (!model && !ifuPath) {
       if (/\.pdf$/i.test(text) || text.startsWith('ifus/')) {
         ifuPath = text.trim();
@@ -157,18 +175,26 @@ export class ScanComponent implements OnDestroy {
     this.model.set(model);
     this.ifuPath.set(ifuPath);
 
-    // 若只有型号，调后端定位 IFU
+    // 若只有型号，调后端定位 IFU，并将返回的 GUID 用作 ifu_path
     if (model && !ifuPath) {
       try {
         const r = await this.ifu.getIfu(model).toPromise();
-        ifuPath = r?.ifuPath || '';
+        ifuPath = (r?.ifuPath || '').trim();
         this.ifuPath.set(ifuPath);
+        // 显示最终用于检索的 ifu_path（例如 GUID），以符合“之后都用该值”的语义
+        if (ifuPath) {
+          this.scanText.set(ifuPath);
+        }
       } catch (e) {
         console.error(e);
       }
     }
 
     this.ctx.setSelection({ model, ifuPath });
+  }
+
+  goSearch() {
+    this.router.navigate(['/search']);
   }
 
   goChat() {
