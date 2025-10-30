@@ -27,6 +27,8 @@
     "@angular/router": "^18.2.0",
     "@zxing/browser": "0.1.5",
     "@zxing/library": "^0.19.2",
+    "ngx-markdown": "^18.0.0",
+    "marked": "^12.0.2",
     "rxjs": "~7.8.1",
     "tslib": "^2.6.2",
     "zone.js": "~0.14.10"

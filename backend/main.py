@@ -345,12 +345,19 @@ def search_ifu(keyword: str, ifu_path: Optional[str] = None):
     if ifu_path:
         ifu_path = unquote(ifu_path)
         try:
-            system_prompt = (
+            """ system_prompt = (
                 "你是医疗设备说明书检索助手。只在提供的 IFU 文档内进行检索，"
                 "严格限制在 ragConfig.globFilter 指定的文档范围内。\n"
                 "根据用户关键词返回 JSON 结果，不要输出任何多余文字。\n"
                 "输出格式: {\"results\":[{\"doc\":string,\"page\":number,\"snippet\":string}]}。\n"
-                "要求: snippet 不超过120字；若无法确定页码，使用1。"
+                "要求: snippet 不超过500字；若无法确定页码，使用1。"
+            ) """
+            system_prompt = (
+            "你是医疗设备说明书检索助手。仅在 ragConfig.globFilter 指定的 IFU 文档中检索。\n"
+            "根据用户关键词返回严格的 JSON（仅 JSON，无多余文字）。\n"
+            "snippet 必须为原文截取：以命中关键词为中心，向前后扩展若干句，尽量接近长度上限。\n"
+            "输出格式: {\"results\":[{\"doc\":string,\"page\":number,\"refId\":string,\"score\":number,\"snippet\":string}]}\n"
+            "要求: 每条 snippet 300–800字，允许换行与标点；尽量接近上限；若无法确定页码，使用1；返回最多10条。"
             )
             # Use GAIA with glob filter set to the located IFU path
             content = call_gaia(text=f"keyword: {keyword}", system_prompt=system_prompt, glob_filter=ifu_path)
@@ -368,7 +375,7 @@ def search_ifu(keyword: str, ifu_path: Optional[str] = None):
                             valid.append({
                                 "doc": doc,
                                 "page": max(1, page),
-                                "snippet": snippet[:120]
+                                "snippet": snippet[:3000]
                             })
                     if valid:
                         return {"results": valid}

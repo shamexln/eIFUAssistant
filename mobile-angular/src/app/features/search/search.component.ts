@@ -7,9 +7,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MarkdownModule } from 'ngx-markdown';
 import { IfuService, SearchIfuResult } from '../../core/services/ifu.service';
 import { IfuContextService } from '../../core/services/ifu-context.service';
 import { Router } from '@angular/router';
+import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
 
 @Component({
   selector: 'app-ifu-search',
@@ -22,7 +24,9 @@ import { Router } from '@angular/router';
     MatInputModule,
     MatButtonModule,
     MatListModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    MarkdownModule,
+    UnescapeNewlinesPipe
   ],
   template: `
     <div class="container">
@@ -56,22 +60,15 @@ import { Router } from '@angular/router';
           <div class="result" *ngIf="results().length || searched()">
             <h3>搜索结果（{{ results().length }}）</h3>
             <div class="empty" *ngIf="!results().length">未找到相关内容</div>
-            <mat-nav-list *ngIf="results().length">
-              <a mat-list-item *ngFor="let r of results(); let i = index" (click)="onViewDetail(r)" [attr.data-index]="i">
+            <mat-nav-list *ngIf="results().length" class="result-list">
+              <mat-list-item *ngFor="let r of results(); let i = index" >
                 <span matListItemTitle>{{ r.doc }}</span>
                 <span matListItemLine>第 {{ r.page }} 页</span>
-                <span class="snippet" *ngIf="r.snippet">{{ r.snippet }}</span>
-              </a>
+                <markdown matListItemLine class="snippet" *ngIf="r.snippet" [data]="r.snippet | unescapeNewlines"></markdown>
+              </mat-list-item>
             </mat-nav-list>
           </div>
 
-          <div class="detail" *ngIf="detailContent()">
-            <h3>详情</h3>
-            <pre>{{ detailContent() }}</pre>
-            <div class="actions">
-              <button mat-button color="primary" (click)="clearDetail()">关闭</button>
-            </div>
-          </div>
         </mat-card-content>
       </mat-card>
     </div>
@@ -82,15 +79,34 @@ import { Router } from '@angular/router';
     .field { width: 100%; }
     .actions { display: flex; gap: 12px; align-items: center; }
     .result { margin-top: 12px; }
-    .snippet { color: rgba(0,0,0,0.6); font-size: 12px; display: block; }
-    pre { white-space: pre-wrap; background: #fff; border: 1px solid rgba(0,0,0,0.12); padding: 8px; border-radius: 6px; max-height: 50vh; overflow: auto; }
+    /* Results container: scroll vertically, no horizontal scroll */
+    .result-list { max-height: 60vh; overflow-y: auto; overflow-x: hidden; border: 1px solid rgba(0,0,0,0.12); border-radius: 6px; }
+    /* Let list items grow to fit their content (disable fixed MDC heights) */
+    .result-list .mat-mdc-list-item { height: auto; align-items: flex-start; }
+    .result-list .mdc-list-item { height: auto; align-items: flex-start; 
+      --mdc-list-list-item-one-line-container-height: auto; 
+      --mdc-list-list-item-two-line-container-height: auto; 
+      --mdc-list-list-item-three-line-container-height: auto; }
+    .result-list .mdc-list-item__primary-text { white-space: normal; overflow: visible; text-overflow: unset; }
+    /* Wrap long titles and secondary lines */
+    .result-list .mat-mdc-list-item-title, .result-list .mat-mdc-list-item-line { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+    .snippet { color: rgba(0,0,0,0.75); font-size: 12px; display: block; overflow-wrap: anywhere; word-break: break-word; }
+    /* Markdown content tweaks inside list item */
+    .snippet h1, .snippet h2, .snippet h3 { font-size: 14px; margin: 8px 0 4px; font-weight: 600; }
+    .snippet h4, .snippet h5, .snippet h6 { font-size: 13px; margin: 6px 0 4px; font-weight: 600; }
+    .snippet p { margin: 4px 0; }
+    .snippet ul, .snippet ol { margin: 4px 0 4px 18px; padding: 0; }
+    .snippet li { margin: 2px 0; }
+    .snippet code { background: rgba(0,0,0,0.04); padding: 1px 3px; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .snippet pre { background: rgba(0,0,0,0.04); padding: 6px; border-radius: 4px; overflow: auto; }
+    .snippet a { color: #1976d2; text-decoration: none; }
+    .snippet a:hover { text-decoration: underline; }
   `]
 })
 export class SearchComponent {
   loading = signal(false);
   searched = signal(false);
   results = signal<SearchIfuResult[]>([]);
-  detailContent = signal<string>('');
 
   form = this.fb.group({
     keyword: this.fb.control<string>('', { nonNullable: true, validators: [Validators.required] }),
@@ -112,7 +128,6 @@ export class SearchComponent {
     this.loading.set(true);
     this.results.set([]);
     this.searched.set(true);
-    this.detailContent.set('');
 
     this.ifu.searchIfu(kw, ifuPath).subscribe({
       next: (res) => {
@@ -126,25 +141,6 @@ export class SearchComponent {
     });
   }
 
-  onViewDetail(item: SearchIfuResult) {
-    if (!item?.doc || !item?.page) return;
-    this.loading.set(true);
-    this.detailContent.set('');
-    this.ifu.getContent(item.doc, item.page).subscribe({
-      next: (res) => {
-        this.detailContent.set(res?.content || '');
-      },
-      error: (err) => {
-        console.error('getContent error', err);
-        this.detailContent.set('获取详情失败');
-      },
-      complete: () => this.loading.set(false)
-    });
-  }
-
-  clearDetail() {
-    this.detailContent.set('');
-  }
 
   goScan() {
     this.router.navigate(['/scan']);
