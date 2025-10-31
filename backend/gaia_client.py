@@ -22,7 +22,7 @@ import logging
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 # Config
-GAIA_BASE_URL = os.getenv("GAIA_BASE_URL", "https://api.gaia.draeger.net/api/assistants/fab9226e-cb6b-4ced-9310-e3560804e675/chat/completions")
+GAIA_BASE_URL = os.getenv("GAIA_BASE_URL", "https://api.gaia.draeger.net/api/assistants/fab9226e-cb6b-4ced-9310-e3560804e675/chat/completions?format=codegpt&stream=true")
 MODEL_NAME = os.getenv("GAIA_MODEL", "GPT 4.1")
 TIMEOUT = int(os.getenv("GAIA_TIMEOUT", "60"))
 MAX_RETRY = int(os.getenv("GAIA_MAX_RETRY", "3"))
@@ -47,6 +47,11 @@ _session_id = os.getenv("GAIA_SESSION_ID") or uuid.uuid4().hex
 # Ensure auth headers are set for the session (Gaia requires token)
 if GAIA_API_KEY:
     _session_obj.headers.update({
+        "X-LLM-Application-Tag": "proxyai",
+        "Accept-Encoding": "gzip, deflate", # 压缩更快
+        "Content-Type": "application/json",
+        "Connection": "keep-alive",
+        "Accept": "text/event-stream",      # 关键：告诉服务端你要 SSE
         "Authorization": f"Bearer {GAIA_API_KEY}",
         "X-Session-Id": _session_id
     })
@@ -64,6 +69,11 @@ def _reset_session() -> None:
     _session_obj.close()
     _session_obj = requests.Session()
     _session_obj.headers.update({
+            "X-LLM-Application-Tag": "proxyai",
+            "Accept-Encoding": "gzip, deflate", # 压缩更快
+            "Content-Type": "application/json",
+            "Connection": "keep-alive",
+            "Accept": "text/event-stream",      # 关键：告诉服务端你要 SSE
             "Authorization": f"Bearer {GAIA_API_KEY}",
             "X-Session-Id":  _session_id
         })
@@ -115,6 +125,7 @@ def call_gaia(text: str, system_prompt: str, glob_filter: str = None) -> str:
 
     payload = {
         "model": MODEL_NAME,
+        "stream": True,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
