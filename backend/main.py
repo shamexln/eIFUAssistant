@@ -288,10 +288,10 @@ from urllib.parse import unquote
 
 # Simple in-memory IFU mapping and mock data
 _IFU_MAP = {
-    "Vista 300": "41f4f2b3-4ae1-42f3-b824-b7430ffb45c5",
-    "Vista 120": "ifus/Vista_120.pdf",
-    "Imprivata": "ifus/Imprivata_Guide.pdf",
-    "Epic": "ifus/Epic_Integration.pdf"
+    "Vista 300": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
+    "Vista 120": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
+    "Atlan 100": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
+    "Epic": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"}
 }
 
 _MOCK_DOCS = {
@@ -321,21 +321,20 @@ def get_ifu(model: str):
         raise HTTPException(status_code=400, detail="model 不能为空")
     # 支持宽松匹配：完全匹配优先，其次大小写不敏感包含
     if model in _IFU_MAP:
-        path = _IFU_MAP[model]
+        result = _IFU_MAP[model]
     else:
         low = model.lower()
-        path = None
         for k, v in _IFU_MAP.items():
             if low in k.lower():
-                path = v
+                result = v
                 break
-    if not path:
-        return {"ifuPath": ""}
-    return {"ifuPath": path}
+    if not result:
+        return {"assistantid": "", "containerid": ""}
+    return {"assistantid": result["assistantid"], "containerid": result["containerid"]}
 
 
 @app.get("/search_ifu")
-def search_ifu(keyword: str, ifu_path: Optional[str] = None):
+def search_ifu(keyword: str, assitantid: Optional[str] = None, ifu_path: Optional[str] = None):
     keyword = (keyword or "").strip()
     if not keyword:
         raise HTTPException(status_code=400, detail="keyword 不能为空")
@@ -360,9 +359,10 @@ def search_ifu(keyword: str, ifu_path: Optional[str] = None):
             "要求: 每条 snippet 300–800字，允许换行与标点；尽量接近上限；若无法确定页码，使用1；返回最多10条。"
             )
             # Use GAIA with glob filter set to the located IFU path
-            content = call_gaia(text=f"keyword: {keyword}", system_prompt=system_prompt, glob_filter=ifu_path)
+            content = call_gaia(text=f"keyword: {keyword}", system_prompt=system_prompt, assitantid=assitantid, glob_filter=ifu_path)
             if content:
                 try:
+                    print(content)
                     data = json.loads(content)
                     results = data.get("results", []) if isinstance(data, dict) else []
                     # Basic validation of result items

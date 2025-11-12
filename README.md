@@ -229,7 +229,7 @@ miniprogram/            # 小程序代码
   ```bash
   pip install gunicorn uvicorn
   # 启动命令示例（调试用）：
-  gunicorn backend.main:app -k uvicorn.workers.UvicornWorker -b 127.0.0.1:9000 -w 2
+  gunicorn backend.main:app -k uvicorn.workers.UvicornWorker -b 10.0.4.17:9000 -w 2
   ```
 - 可选：配置 systemd 服务（示例）
   ```ini

@@ -2,10 +2,11 @@ import os
 import threading
 import time
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import requests
 import uuid
+import json
 from fastapi import HTTPException
 
 # Logger setup
@@ -22,7 +23,14 @@ import logging
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 # Config
-GAIA_BASE_URL = os.getenv("GAIA_BASE_URL", "https://api.gaia.draeger.net/api/assistants/fab9226e-cb6b-4ced-9310-e3560804e675/chat/completions?format=codegpt&stream=true")
+# Allow GAIA_BASE_URL to be a template containing {assistantid}.
+# Resolution now happens per-call to allow using call_gaia(..., assitantid=...).
+GAIA_ASSISTANT_ID = os.getenv("GAIA_ASSISTANT_ID") or os.getenv("GAIA_ASSITANT_ID")  # fallback for common typo
+GAIA_BASE_URL_TEMPLATE = "https://api.gaia.draeger.net/api/assistants/{assistantid}/chat/completions?format=codegpt&stream=true"
+GAIA_BASE_URL_RAW = os.getenv("GAIA_BASE_URL", GAIA_BASE_URL_TEMPLATE)
+
+# Backward-compat placeholder; final URL is built at request time
+GAIA_BASE_URL = None
 MODEL_NAME = os.getenv("GAIA_MODEL", "GPT 4.1")
 TIMEOUT = int(os.getenv("GAIA_TIMEOUT", "60"))
 MAX_RETRY = int(os.getenv("GAIA_MAX_RETRY", "3"))
@@ -30,7 +38,7 @@ BACKOFF_BASE = float(os.getenv("GAIA_BACKOFF_BASE", "1.5"))
 SESSION_TOKEN_LIMIT = int(os.getenv("GAIA_SESSION_TOKEN_LIMIT", "120000"))
 MAX_RESPONSE_TOKENS = int(os.getenv("GAIA_MAX_RESPONSE_TOKENS", "102400"))
 PLACEHOLDER = os.getenv("GAIA_PLACEHOLDER", "对不起，服务繁忙，请稍后再试。")
-GAIA_API_KEY   = os.getenv("GAIA_API_KEY", "bX3AA33tqeXZmEI1uTrXjhOVKuDSacFNCyZ_taV5xIM")
+GAIA_API_KEY   = os.getenv("GAIA_API_KEY", "wQ51aOrIoNh1MCbm54bsUtCsmYRCPxH6FGRj54Dlw1s")
 
 # Logging controls
 LOG_PAYLOADS = os.getenv("GAIA_LOG_PAYLOADS", "true").lower() in ("1", "true", "yes", "on")
@@ -38,6 +46,40 @@ MAX_LOG_CHARS = int(os.getenv("GAIA_MAX_LOG_CHARS", "2000"))
 
 # Internal state
 _session_obj = requests.Session()
+
+
+def _build_gaia_url(assitantid: Optional[str]) -> str:
+    """Build the Gaia URL per call.
+    Priority:
+    1) If GAIA_BASE_URL_RAW contains {assistantid}/{assitantid}, replace with function param if provided,
+       else fall back to GAIA_ASSISTANT_ID. If still missing, raise 400.
+    2) If GAIA_BASE_URL_RAW has no placeholder:
+       - If function param provided, prefer the official template GAIA_BASE_URL_TEMPLATE with that id.
+       - Else, use GAIA_BASE_URL_RAW as-is.
+    """
+    template = GAIA_BASE_URL_RAW or GAIA_BASE_URL_TEMPLATE
+
+    if "{assistantid}" in template:
+        final_id = assitantid or GAIA_ASSISTANT_ID
+        if not final_id:
+            logger.warning("Missing assistant id: neither function param nor GAIA_ASSISTANT_ID provided, but template needs it.")
+            raise HTTPException(status_code=400, detail="缺少 assistantid：请在调用参数或环境变量 GAIA_ASSISTANT_ID 中提供。")
+        url = template.replace("{assistantid}", final_id)
+    else:
+        # No placeholder in template
+        if assitantid:
+            # Prefer official template when caller explicitly passes an id
+            url = GAIA_BASE_URL_TEMPLATE.replace("{assistantid}", assitantid)
+        else:
+            url = template
+
+    # Basic validation
+    if not url or "{" in url or "}" in url:
+        raise HTTPException(status_code=500, detail="GAIA_BASE_URL 解析失败：存在未替换占位符或配置为空。")
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(status_code=500, detail="GAIA_BASE_URL 无效：必须以 http:// 或 https:// 开头。")
+
+    return url
 _lock = threading.Lock()
 _used_tokens = 0
 
@@ -47,11 +89,10 @@ _session_id = os.getenv("GAIA_SESSION_ID") or uuid.uuid4().hex
 # Ensure auth headers are set for the session (Gaia requires token)
 if GAIA_API_KEY:
     _session_obj.headers.update({
-        "X-LLM-Application-Tag": "proxyai",
         "Accept-Encoding": "gzip, deflate", # 压缩更快
         "Content-Type": "application/json",
         "Connection": "keep-alive",
-        "Accept": "text/event-stream",      # 关键：告诉服务端你要 SSE
+        "Accept": "text/event-stream",
         "Authorization": f"Bearer {GAIA_API_KEY}",
         "X-Session-Id": _session_id
     })
@@ -69,11 +110,10 @@ def _reset_session() -> None:
     _session_obj.close()
     _session_obj = requests.Session()
     _session_obj.headers.update({
-            "X-LLM-Application-Tag": "proxyai",
             "Accept-Encoding": "gzip, deflate", # 压缩更快
             "Content-Type": "application/json",
             "Connection": "keep-alive",
-            "Accept": "text/event-stream",      # 关键：告诉服务端你要 SSE
+            "Accept": "text/event-stream",
             "Authorization": f"Bearer {GAIA_API_KEY}",
             "X-Session-Id":  _session_id
         })
@@ -112,7 +152,7 @@ def _parse_gaia_response(data: Dict[str, Any]) -> str:
     raise RuntimeError("Unexpected Gaia response format")
 
 
-def call_gaia(text: str, system_prompt: str, glob_filter: str = None) -> str:
+def call_gaia(text: str, system_prompt: str, assitantid:str = None, glob_filter: str = None) -> str:
     logger.info(f"本批 prompt:\n{system_prompt}")
     global _used_tokens
     prompt_tokens = count_tokens(text) + count_tokens(system_prompt) + 50  # 估算 system prompt 50 token
@@ -147,18 +187,68 @@ def call_gaia(text: str, system_prompt: str, glob_filter: str = None) -> str:
     for attempt in range(1, MAX_RETRY + 1):
         try:
             logger.debug(f"Calling Gaia, attempt {attempt}")
-            resp = _session_obj.post(GAIA_BASE_URL, json=payload, timeout=TIMEOUT)
+            # Resolve URL per-call using function parameter or env
+            url = _build_gaia_url(assitantid)
+            logger.debug(f"Resolved Gaia URL: {url}")
+            # Gaia endpoint may return Server-Sent Events (text/event-stream) when stream=true
+            resp = _session_obj.post(url, json=payload, timeout=TIMEOUT, stream=True)
             resp.raise_for_status()
-            data = resp.json()
 
-            completion = (
-                data.get("completionTokenCount") or
-                (data.get("usage", {}) or {}).get("completion_tokens", 0)
-            )
+            ctype = (resp.headers.get("Content-Type") or "").lower()
+            is_sse = "text/event-stream" in ctype
+
+            # Accumulate content whether streaming or not
+            accumulated = []
+            completion_tokens = 0
+
+            if is_sse:
+                logger.debug("Parsing SSE stream from Gaia…")
+                for raw_line in resp.iter_lines(decode_unicode=True):
+                    if not raw_line:
+                        continue
+                    line = raw_line.strip()
+                    if not line.startswith("data:"):
+                        continue
+                    payload_str = line[5:].strip()  # trim leading 'data:'
+                    if payload_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(payload_str)
+                    except Exception:
+                        # Skip malformed lines
+                        continue
+
+                    # Two possible shapes: OpenAI-style delta, or custom content field
+                    delta = None
+                    if isinstance(chunk, dict):
+                        # Count tokens if provided on final message
+                        completion_tokens += int(
+                            chunk.get("completionTokenCount") or
+                            (chunk.get("usage", {}) or {}).get("completion_tokens", 0) or 0
+                        )
+                        if "choices" in chunk and chunk.get("choices"):
+                            delta = (((chunk["choices"][0] or {}).get("delta") or {}).get("content"))
+                        elif "content" in chunk:
+                            delta = chunk.get("content")
+                    if delta:
+                        accumulated.append(str(delta))
+
+                content = ("".join(accumulated)).strip()
+            else:
+                # Non-stream JSON response
+                data = resp.json()
+                completion_tokens = int(
+                    data.get("completionTokenCount") or
+                    (data.get("usage", {}) or {}).get("completion_tokens", 0) or 0
+                )
+                content = _parse_gaia_response(data)
+
+            # Update token usage (best effort)
+            if not completion_tokens and content:
+                completion_tokens = count_tokens(content)
             with _lock:
-                _used_tokens += int(completion or 0)
+                _used_tokens += int(completion_tokens or 0)
 
-            content = _parse_gaia_response(data)
             if LOG_PAYLOADS:
                 logger.info("Gaia 返回内容: %s", _clip_for_log(content))
             return content

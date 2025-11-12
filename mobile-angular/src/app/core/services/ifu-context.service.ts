@@ -2,7 +2,8 @@ import { Injectable, signal } from '@angular/core';
 
 export interface IfuSelection {
   model?: string;
-  ifuPath?: string; // e.g., ifus/Vista_300.pdf
+  assistantid?: string; // e.g., ifus/Vista_300.pdf
+  containerid?: string;
 }
 
 @Injectable({ providedIn: 'root' })

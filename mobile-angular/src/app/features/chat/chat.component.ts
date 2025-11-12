@@ -135,7 +135,7 @@ export class ChatComponent {
     if (sel && !this.form?.value?.system_prompt) {
       const hintParts: string[] = [];
       if (sel.model) hintParts.push(`设备型号为：${sel.model}`);
-      if (sel.ifuPath) hintParts.push(`相关 IFU：${sel.ifuPath}`);
+      if (sel.assistantid) hintParts.push(`相关 IFU：${sel.assistantid}`);
       const defaultPrompt = `请结合以下上下文回答并尽量引用原文：\n${hintParts.join('\n')}`;
       this.form.patchValue({ system_prompt: defaultPrompt });
     }

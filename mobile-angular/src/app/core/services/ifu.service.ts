@@ -4,7 +4,8 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface GetIfuResponse {
-  ifuPath: string;
+    assistantid: string;
+    containerid: string;
 }
 
 export interface SearchIfuResult {
@@ -32,9 +33,10 @@ export class IfuService {
     return this.http.get<GetIfuResponse>(`${this.base}/get_ifu`, { params });
   }
 
-  searchIfu(keyword: string, ifuPath?: string): Observable<SearchIfuResponse> {
+  searchIfu(keyword: string, assistantid?: string, containerid?: string): Observable<SearchIfuResponse> {
     let params = new HttpParams().set('keyword', keyword);
-    if (ifuPath) params = params.set('ifu_path', ifuPath);
+    if (assistantid) params = params.set('assistantid', assistantid);
+    if (containerid) params = params.set('containerid', containerid);
     return this.http.get<SearchIfuResponse>(`${this.base}/search_ifu`, { params });
   }
 

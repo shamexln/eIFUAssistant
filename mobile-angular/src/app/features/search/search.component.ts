@@ -64,7 +64,8 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
               <mat-list-item *ngFor="let r of results(); let i = index" >
                 <span matListItemTitle>{{ r.doc }}</span>
                 <span matListItemLine>第 {{ r.page }} 页</span>
-                <markdown matListItemLine class="snippet" *ngIf="r.snippet" [data]="r.snippet | unescapeNewlines"></markdown>
+                <!-- 使用 div 替代 markdown，按原样显示文本并保留换行 -->
+                <div matListItemLine class="snippet" *ngIf="r.snippet" [innerText]="r.snippet | unescapeNewlines"></div>
               </mat-list-item>
             </mat-nav-list>
           </div>
@@ -90,17 +91,8 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
     .result-list .mdc-list-item__primary-text { white-space: normal; overflow: visible; text-overflow: unset; }
     /* Wrap long titles and secondary lines */
     .result-list .mat-mdc-list-item-title, .result-list .mat-mdc-list-item-line { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
-    .snippet { color: rgba(0,0,0,0.75); font-size: 12px; display: block; overflow-wrap: anywhere; word-break: break-word; }
-    /* Markdown content tweaks inside list item */
-    .snippet h1, .snippet h2, .snippet h3 { font-size: 14px; margin: 8px 0 4px; font-weight: 600; }
-    .snippet h4, .snippet h5, .snippet h6 { font-size: 13px; margin: 6px 0 4px; font-weight: 600; }
-    .snippet p { margin: 4px 0; }
-    .snippet ul, .snippet ol { margin: 4px 0 4px 18px; padding: 0; }
-    .snippet li { margin: 2px 0; }
-    .snippet code { background: rgba(0,0,0,0.04); padding: 1px 3px; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .snippet pre { background: rgba(0,0,0,0.04); padding: 6px; border-radius: 4px; overflow: auto; }
-    .snippet a { color: #1976d2; text-decoration: none; }
-    .snippet a:hover { text-decoration: underline; }
+    .snippet { color: rgba(0,0,0,0.75); font-size: 12px; display: block; overflow-wrap: anywhere; word-break: break-word; white-space: pre-line; }
+    /* 纯文本渲染，无需 Markdown 内部样式 */
   `]
 })
 export class SearchComponent {
@@ -123,13 +115,14 @@ export class SearchComponent {
     if (this.form.invalid) return;
     const kw = this.form.getRawValue().keyword.trim();
     if (!kw) return;
-    const ifuPath = this.ctx.selection()?.ifuPath || undefined;
+    const assistantid = this.ctx.selection()?.assistantid || undefined;
+    const containerid = this.ctx.selection()?.containerid || undefined;
 
     this.loading.set(true);
     this.results.set([]);
     this.searched.set(true);
 
-    this.ifu.searchIfu(kw, ifuPath).subscribe({
+    this.ifu.searchIfu(kw, assistantid, containerid).subscribe({
       next: (res) => {
         this.results.set(res?.results || []);
       },
