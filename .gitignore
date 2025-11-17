@@ -7,3 +7,6 @@
 /mobile-angular/.angular/cache/18.2.21
 /.vs
 /.idea
+/backend/__pycache__/gaia_client.cpython-313.pyc
+/backend/__pycache__/main.cpython-313.pyc
+/backend/__pycache__/__init__.cpython-313.pyc

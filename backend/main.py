@@ -46,6 +46,7 @@ class GaiaResponse(BaseModel):
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok"}
 
@@ -296,6 +297,7 @@ _IFU_MAP = {
 
 
 @app.get("/get_ifu")
+@app.get("/api/get_ifu")
 def get_ifu(model: str):
     model = (model or "").strip()
     if not model:
@@ -315,6 +317,7 @@ def get_ifu(model: str):
 
 
 @app.get("/search_ifu")
+@app.get("/api/search_ifu")
 def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Optional[str] = None):
     keyword = (keyword or "").strip()
     if not keyword:
@@ -364,6 +367,7 @@ def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Opt
 
 
 @app.get("/get_content")
+@app.get("/api/get_content")
 def get_content(doc_path: str, page: int = 1):
     # Local mock content has been removed; this endpoint is no longer supported.
     raise HTTPException(status_code=501, detail="本地模拟内容已移除：/get_content 不再提供服务，请改用 GAIA 检索与内容获取。")

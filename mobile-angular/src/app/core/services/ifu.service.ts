@@ -30,19 +30,19 @@ export class IfuService {
 
   getIfu(model: string): Observable<GetIfuResponse> {
     const params = new HttpParams().set('model', model);
-    return this.http.get<GetIfuResponse>(`${this.base}/get_ifu`, { params });
+    return this.http.get<GetIfuResponse>(`${this.base}/api/get_ifu`, { params });
   }
 
   searchIfu(keyword: string, assistantid?: string, containerid?: string): Observable<SearchIfuResponse> {
     let params = new HttpParams().set('keyword', keyword);
     if (assistantid) params = params.set('assistantid', assistantid);
     if (containerid) params = params.set('containerid', containerid);
-    return this.http.get<SearchIfuResponse>(`${this.base}/search_ifu`, { params });
+    return this.http.get<SearchIfuResponse>(`${this.base}/api/search_ifu`, { params });
   }
 
   getContent(docPath: string, page?: number): Observable<GetContentResponse> {
     let params = new HttpParams().set('doc_path', docPath);
     if (page && page > 0) params = params.set('page', String(page));
-    return this.http.get<GetContentResponse>(`${this.base}/get_content`, { params });
+    return this.http.get<GetContentResponse>(`${this.base}/api/get_content`, { params });
   }
 }
