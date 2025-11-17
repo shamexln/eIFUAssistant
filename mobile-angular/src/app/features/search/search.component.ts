@@ -60,7 +60,14 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
           <div class="result" *ngIf="results().length || searched()">
             <h3>搜索结果（{{ results().length }}）</h3>
             <div class="empty" *ngIf="!results().length">未找到相关内容</div>
-            <mat-nav-list *ngIf="results().length" class="result-list">
+            <mat-nav-list *ngIf="results().length" class="result-list"
+                          (touchstart)="startMagnifier($event)"
+                          (touchmove)="moveMagnifier($event)"
+                          (touchend)="endMagnifier()"
+                          (mousedown)="startMagnifierMouse($event)"
+                          (mousemove)="moveMagnifierMouse($event)"
+                          (mouseup)="endMagnifier()"
+                          (mouseleave)="endMagnifier()">
               <mat-list-item *ngFor="let r of results(); let i = index" >
                 <span matListItemTitle>{{ r.doc }}</span>
                 <span matListItemLine>第 {{ r.page }} 页</span>
@@ -68,6 +75,10 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
                 <div matListItemLine class="snippet" *ngIf="r.snippet" [innerText]="r.snippet | unescapeNewlines"></div>
               </mat-list-item>
             </mat-nav-list>
+            <!-- 放大镜浮层（跟随手指/鼠标） -->
+            <div *ngIf="magVisible()" class="magnifier" [style.left.px]="magX()" [style.top.px]="magY()">
+              {{ magText() }}
+            </div>
           </div>
 
         </mat-card-content>
@@ -92,6 +103,11 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
     /* Wrap long titles and secondary lines */
     .result-list .mat-mdc-list-item-title, .result-list .mat-mdc-list-item-line { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
     .snippet { color: rgba(0,0,0,0.75); font-size: 12px; display: block; overflow-wrap: anywhere; word-break: break-word; white-space: pre-line; }
+    /* 放大镜样式 */
+    .magnifier { position: fixed; z-index: 1000; max-width: 80vw; padding: 10px 12px; border-radius: 12px;
+      background: rgba(255,255,255,0.98); box-shadow: 0 6px 20px rgba(0,0,0,0.25); border: 1px solid rgba(0,0,0,0.08);
+      font-size: 22px; line-height: 1.35; color: #111; pointer-events: none; transform: translate(-50%, -110%);
+      overflow-wrap: anywhere; word-break: break-word; }
     /* 纯文本渲染，无需 Markdown 内部样式 */
   `]
 })
@@ -99,6 +115,11 @@ export class SearchComponent {
   loading = signal(false);
   searched = signal(false);
   results = signal<SearchIfuResult[]>([]);
+  // 放大镜状态
+  magVisible = signal(false);
+  magText = signal('');
+  magX = signal(0);
+  magY = signal(0);
 
   form = this.fb.group({
     keyword: this.fb.control<string>('', { nonNullable: true, validators: [Validators.required] }),
@@ -134,6 +155,60 @@ export class SearchComponent {
     });
   }
 
+
+  // ========== 放大镜交互：长按/按下显示，移动跟随，抬起关闭 ==========
+  private pickTextFromEventTarget(target: EventTarget | null): string {
+    let el: HTMLElement | null = (target as HTMLElement) || null;
+    if (!el) return '';
+    const item = el.closest('.mat-mdc-list-item') as HTMLElement | null;
+    const container = item || el;
+    const preferred = container.querySelector('.snippet') as HTMLElement | null;
+    const title = container.querySelector('.mat-mdc-list-item-title') as HTMLElement | null;
+    const line = container.querySelector('.mat-mdc-list-item-line') as HTMLElement | null;
+    const text = (preferred?.innerText || title?.innerText || line?.innerText || container.innerText || '').trim();
+    return text.length > 400 ? text.slice(0, 400) + '…' : text;
+  }
+
+  private updateMagPosition(clientX: number, clientY: number) {
+    this.magX.set(clientX);
+    this.magY.set(Math.max(70, clientY));
+  }
+
+  startMagnifier(ev: TouchEvent) {
+    if (!ev.touches?.length) return;
+    const t = ev.touches[0];
+    const text = this.pickTextFromEventTarget(ev.target);
+    if (!text) return;
+    this.magText.set(text);
+    this.updateMagPosition(t.clientX, t.clientY);
+    this.magVisible.set(true);
+    ev.preventDefault();
+  }
+
+  moveMagnifier(ev: TouchEvent) {
+    if (!this.magVisible()) return;
+    if (!ev.touches?.length) return;
+    const t = ev.touches[0];
+    this.updateMagPosition(t.clientX, t.clientY);
+    ev.preventDefault();
+  }
+
+  startMagnifierMouse(ev: MouseEvent) {
+    const text = this.pickTextFromEventTarget(ev.target);
+    if (!text) return;
+    this.magText.set(text);
+    this.updateMagPosition(ev.clientX, ev.clientY);
+    this.magVisible.set(true);
+  }
+
+  moveMagnifierMouse(ev: MouseEvent) {
+    if (!this.magVisible()) return;
+    this.updateMagPosition(ev.clientX, ev.clientY);
+  }
+
+  endMagnifier() {
+    this.magVisible.set(false);
+  }
 
   goScan() {
     this.router.navigate(['/scan']);

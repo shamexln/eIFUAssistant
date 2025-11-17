@@ -22,7 +22,7 @@ import { Result } from '@zxing/library';
                   <mat-card-subtitle>扫描包含型号或文档路径的二维码，自动定位 IFU</mat-card-subtitle>
               </mat-card-header>
               <mat-card-content>
-                  <div class="video-wrap">
+                  <div class="video-wrap" [class.compact]="hasResult()">
                       <video #preview id="preview" playsinline></video>
                   </div>
                   <div class="hint">
@@ -51,21 +51,30 @@ import { Result } from '@zxing/library';
                   <button mat-raised-button color="primary" (click)="goSearch()"
                           [disabled]="!containerid() && !assistantid() && !model()">去检索
                   </button>
-                  <button mat-raised-button color="accent" (click)="goChat()"
-                          [disabled]="!containerid() && !assistantid() && !model()">
-                      去聊天
-                  </button>
               </mat-card-actions>
           </mat-card>
       </div>
   `,
   styles: [`
-    .video-wrap { position: relative; width: 100%; aspect-ratio: 3/4; background: #000; border-radius: 8px; overflow: hidden; }
-    video { width: 100%; height: 100%; object-fit: cover; }
-    .actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
-    .hint { color: rgba(0,0,0,0.6); font-size: 13px; margin: 8px 0 4px; }
-    .result, .resolve { margin-top: 12px; }
-    pre { white-space: pre-wrap; background: #f6f6f6; padding: 8px; border-radius: 6px; }
+    .container { padding: 8px; }
+    .video-wrap { position: relative; width: 100%; aspect-ratio: 3/4; background: #000; border-radius: 8px; overflow: hidden; max-height: 50vh; }
+    /* 当已有识别结果时，进一步压缩预览区高度，避免出现滚动条 */
+    .video-wrap.compact { max-height: 38vh; }
+    video { width: 100%; height: 100%; object-fit: contain; }
+    .actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .hint { color: rgba(0,0,0,0.6); font-size: 12px; margin: 6px 0 2px; }
+    .result, .resolve { margin-top: 8px; }
+    .result h3, .resolve h3 { margin: 6px 0; font-size: 14px; }
+    pre { white-space: pre-wrap; background: #f6f6f6; padding: 6px; border-radius: 6px; font-size: 12px; }
+
+    /* Mobile fine-tuning to fit one screen on iPhone */
+    @media (max-width: 430px) {
+      mat-card-header, mat-card-content, mat-card-actions { padding: 8px !important; }
+      .video-wrap { aspect-ratio: 1/1; max-height: 44vh; }
+      .video-wrap.compact { max-height: 34vh; }
+      .actions button { padding: 6px 10px; min-width: 0; }
+      .hint { font-size: 11px; }
+    }
   `]
 })
 export class ScanComponent implements OnDestroy {
@@ -208,7 +217,10 @@ export class ScanComponent implements OnDestroy {
     this.router.navigate(['/search']);
   }
 
-  goChat() {
-    this.router.navigate(['/chat']);
+  // 聊天页面已移除
+
+  // 是否已有识别结果，用于触发紧凑布局，压缩视频预览高度
+  hasResult(): boolean {
+    return !!(this.scanAssistantidText() || this.model() || this.assistantid() || this.containerid());
   }
 }

@@ -290,29 +290,10 @@ from urllib.parse import unquote
 _IFU_MAP = {
     "Vista 300": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
     "Vista 120": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
-    "Atlan 100": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
+    "Atlan 100": {"assistantid":"45bcc1e2-79f6-46bf-94fc-3e5c94168ee7","containerid":"e05d7522-891a-416a-8bed-cbefc0c64209"},
     "Epic": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"}
 }
 
-_MOCK_DOCS = {
-    "ifus/Vista_300.pdf": [
-        "Vista 300 使用说明书 第1页：概述与安全信息。",
-        "第2页：开机、基本设置与报警限设置。",
-        "第3页：网络、联机及常见问题。"
-    ],
-    "ifus/Vista_120.pdf": [
-        "Vista 120 用户手册 第1页：产品简介。",
-        "第2页：按键说明与维护保养。"
-    ],
-    "ifus/Imprivata_Guide.pdf": [
-        "Imprivata 介绍与单点登录概览。",
-        "配置步骤与常见故障排查。"
-    ],
-    "ifus/Epic_Integration.pdf": [
-        "Epic 集成概述。",
-        "HL7 接口与数据流配置。"
-    ]
-}
 
 @app.get("/get_ifu")
 def get_ifu(model: str):
@@ -334,86 +315,55 @@ def get_ifu(model: str):
 
 
 @app.get("/search_ifu")
-def search_ifu(keyword: str, assitantid: Optional[str] = None, ifu_path: Optional[str] = None):
+def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Optional[str] = None):
     keyword = (keyword or "").strip()
     if not keyword:
         raise HTTPException(status_code=400, detail="keyword 不能为空")
-    ifu_path = (ifu_path or "").strip()
+    localassistantid = (assistantid or "").strip()
+    if not localassistantid:
+        raise HTTPException(status_code=400, detail="必须提供 assistantid 才能检索")
 
-    # If specific IFU is provided, try GAIA restricted search first
-    if ifu_path:
-        ifu_path = unquote(ifu_path)
-        try:
-            """ system_prompt = (
-                "你是医疗设备说明书检索助手。只在提供的 IFU 文档内进行检索，"
-                "严格限制在 ragConfig.globFilter 指定的文档范围内。\n"
-                "根据用户关键词返回 JSON 结果，不要输出任何多余文字。\n"
-                "输出格式: {\"results\":[{\"doc\":string,\"page\":number,\"snippet\":string}]}。\n"
-                "要求: snippet 不超过500字；若无法确定页码，使用1。"
-            ) """
-            system_prompt = (
+    # Use GAIA restricted search only; no local mock fallback
+    assistantID = unquote(localassistantid)
+    try:
+        system_prompt = (
             "你是医疗设备说明书检索助手。仅在 ragConfig.globFilter 指定的 IFU 文档中检索。\n"
             "根据用户关键词返回严格的 JSON（仅 JSON，无多余文字）。\n"
             "snippet 必须为原文截取：以命中关键词为中心，向前后扩展若干句，尽量接近长度上限。\n"
             "输出格式: {\"results\":[{\"doc\":string,\"page\":number,\"refId\":string,\"score\":number,\"snippet\":string}]}\n"
-            "要求: 每条 snippet 300–800字，允许换行与标点；尽量接近上限；若无法确定页码，使用1；返回最多10条。"
-            )
-            # Use GAIA with glob filter set to the located IFU path
-            content = call_gaia(text=f"keyword: {keyword}", system_prompt=system_prompt, assitantid=assitantid, glob_filter=ifu_path)
-            if content:
-                try:
-                    print(content)
-                    data = json.loads(content)
-                    results = data.get("results", []) if isinstance(data, dict) else []
-                    # Basic validation of result items
-                    valid = []
-                    for it in results:
-                        doc = str(it.get("doc", ifu_path)).strip() if isinstance(it, dict) else ""
-                        page = int(it.get("page", 1)) if isinstance(it, dict) else 1
-                        snippet = str(it.get("snippet", "")).strip() if isinstance(it, dict) else ""
-                        if doc:
-                            valid.append({
-                                "doc": doc,
-                                "page": max(1, page),
-                                "snippet": snippet[:3000]
-                            })
-                    if valid:
-                        return {"results": valid}
-                except Exception:
-                    # fall back to local search
-                    pass
-        except HTTPException:
-            # bubble up GAIA auth errors, etc.
-            raise
-        except Exception:
-            # swallow and fall back
-            pass
-
-    # Fallback: local mock text search across the selected IFU or all IFUs
-    targets = {ifu_path: _MOCK_DOCS.get(ifu_path, [])} if ifu_path else _MOCK_DOCS
-    results = []
-    for doc_path, pages in targets.items():
-        for idx, text in enumerate(pages, start=1):
-            if keyword.lower() in text.lower():
-                results.append({
-                    "doc": doc_path,
-                    "page": idx,
-                    "snippet": text if len(text) <= 120 else (text[:117] + "...")
-                })
-    return {"results": results}
+            "要求: 每条 snippet 300–800字，允许换行与标点；尽量接近上限；若无法确定页码，使用1；返回最多1000条。"
+        )
+        content = call_gaia(text=f"keyword: {keyword}", system_prompt=system_prompt, assistantid=assistantID, glob_filter=containerid)
+        if content:
+            try:
+                data = json.loads(content)
+                results = data.get("results", []) if isinstance(data, dict) else []
+                # Basic validation of result items
+                valid = []
+                for it in results:
+                    doc = str(it.get("doc", assistantID)).strip() if isinstance(it, dict) else ""
+                    page = int(it.get("page", 1)) if isinstance(it, dict) else 1
+                    snippet = str(it.get("snippet", "")).strip() if isinstance(it, dict) else ""
+                    if doc:
+                        valid.append({
+                            "doc": doc,
+                            "page": max(1, page),
+                            "snippet": snippet[:3000]
+                        })
+                return {"results": valid}
+            except Exception:
+                # If GAIA returns non-JSON, surface empty results
+                return {"results": []}
+        return {"results": []}
+    except HTTPException:
+        # bubble up GAIA auth errors, etc.
+        raise
+    except Exception:
+        # On any failure, return empty results without using local mocks
+        return {"results": []}
 
 
 @app.get("/get_content")
 def get_content(doc_path: str, page: int = 1):
-    doc_path = unquote(doc_path or "").strip()
-    if not doc_path:
-        raise HTTPException(status_code=400, detail="doc_path 不能为空")
-    if page is None or page < 1:
-        raise HTTPException(status_code=400, detail="page 参数非法")
-    pages = _MOCK_DOCS.get(doc_path)
-    if not pages:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    if page > len(pages):
-        raise HTTPException(status_code=404, detail="指定页不存在")
-    content = pages[page - 1]
-    return {"content": content, "images": []}
+    # Local mock content has been removed; this endpoint is no longer supported.
+    raise HTTPException(status_code=501, detail="本地模拟内容已移除：/get_content 不再提供服务，请改用 GAIA 检索与内容获取。")

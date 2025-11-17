@@ -212,12 +212,17 @@ miniprogram/            # 小程序代码
 ### 步骤 A：构建前端（Angular）
 1. 配置生产环境后端地址：`mobile-angular/src/environments/environment.prod.ts`
    - 若使用同域反代（推荐），可将 `backendBaseUrl` 设为相对路径（如 `/` 或 `/api`），前端请求直接走同域路径。
-2. 运行构建：
+2. 运行构建（默认生产配置）：
    ```bash
    cd mobile-angular
    pnpm install
-   pnpm build
+   pnpm build         # 等价于：ng build -c production（会使用 environment.prod.ts）
    ```
+   - 如需开发构建（不会替换 environment.ts，体积更大，保留 sourceMap），可显式指定：
+     ```bash
+     ng build -c development
+     # 或本地调试：ng serve -c development
+     ```
 3. 将 `mobile-angular/dist/eifu-mobile-angular/` 整个目录上传至服务器（例如 `/var/www/eifu-mobile-angular/dist/eifu-mobile-angular`）。
 
 ### 步骤 B：部署后端（FastAPI）

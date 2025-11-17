@@ -13,8 +13,7 @@ import { MatButtonModule } from '@angular/material/button';
       <span class="brand">eIFU Mobile</span>
       <span class="spacer"></span>
       <a class="toolbar-link" [routerLink]="['/scan']" style="margin-right:12px;">扫码</a>
-      <a class="toolbar-link" [routerLink]="['/search']" style="margin-right:12px;">检索</a>
-      <a class="toolbar-link" [routerLink]="['/chat']">聊天</a>
+      <a class="toolbar-link" [routerLink]="['/search']">检索</a>
     </mat-toolbar>
     <main class="app-main">
       <router-outlet></router-outlet>

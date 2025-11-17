@@ -90,7 +90,8 @@ _session_id = os.getenv("GAIA_SESSION_ID") or uuid.uuid4().hex
 if GAIA_API_KEY:
     _session_obj.headers.update({
         "Accept-Encoding": "gzip, deflate", # 压缩更快
-        "Content-Type": "application/json",
+        "Accept-Charset": "utf-8",
+        "Content-Type": "application/json; charset=utf-8",
         "Connection": "keep-alive",
         "Accept": "text/event-stream",
         "Authorization": f"Bearer {GAIA_API_KEY}",
@@ -111,7 +112,8 @@ def _reset_session() -> None:
     _session_obj = requests.Session()
     _session_obj.headers.update({
             "Accept-Encoding": "gzip, deflate", # 压缩更快
-            "Content-Type": "application/json",
+            "Accept-Charset": "utf-8",
+            "Content-Type": "application/json; charset=utf-8",
             "Connection": "keep-alive",
             "Accept": "text/event-stream",
             "Authorization": f"Bearer {GAIA_API_KEY}",
@@ -152,7 +154,7 @@ def _parse_gaia_response(data: Dict[str, Any]) -> str:
     raise RuntimeError("Unexpected Gaia response format")
 
 
-def call_gaia(text: str, system_prompt: str, assitantid:str = None, glob_filter: str = None) -> str:
+def call_gaia(text: str, system_prompt: str, assistantid:str = None, glob_filter: str = None) -> str:
     logger.info(f"本批 prompt:\n{system_prompt}")
     global _used_tokens
     prompt_tokens = count_tokens(text) + count_tokens(system_prompt) + 50  # 估算 system prompt 50 token
@@ -188,13 +190,25 @@ def call_gaia(text: str, system_prompt: str, assitantid:str = None, glob_filter:
         try:
             logger.debug(f"Calling Gaia, attempt {attempt}")
             # Resolve URL per-call using function parameter or env
-            url = _build_gaia_url(assitantid)
+            url = _build_gaia_url(assistantid)
             logger.debug(f"Resolved Gaia URL: {url}")
             # Gaia endpoint may return Server-Sent Events (text/event-stream) when stream=true
             resp = _session_obj.post(url, json=payload, timeout=TIMEOUT, stream=True)
             resp.raise_for_status()
 
             ctype = (resp.headers.get("Content-Type") or "").lower()
+            # Determine charset; default to utf-8 (Gaia uses UTF-8 for SSE/JSON)
+            charset = "utf-8"
+            if "charset=" in ctype:
+                try:
+                    charset = (ctype.split("charset=")[-1].split(";")[0] or "utf-8").strip()
+                except Exception:
+                    charset = "utf-8"
+            # Hint requests for subsequent .text/.json decoding
+            try:
+                resp.encoding = charset
+            except Exception:
+                pass
             is_sse = "text/event-stream" in ctype
 
             # Accumulate content whether streaming or not
@@ -203,10 +217,17 @@ def call_gaia(text: str, system_prompt: str, assitantid:str = None, glob_filter:
 
             if is_sse:
                 logger.debug("Parsing SSE stream from Gaia…")
-                for raw_line in resp.iter_lines(decode_unicode=True):
+                for raw_line in resp.iter_lines(decode_unicode=False):
                     if not raw_line:
                         continue
-                    line = raw_line.strip()
+                    try:
+                        line = raw_line.decode(charset, errors="replace").strip()
+                    except Exception:
+                        # Fallback to utf-8 decoding
+                        try:
+                            line = raw_line.decode("utf-8", errors="replace").strip()
+                        except Exception:
+                            continue
                     if not line.startswith("data:"):
                         continue
                     payload_str = line[5:].strip()  # trim leading 'data:'
@@ -227,7 +248,7 @@ def call_gaia(text: str, system_prompt: str, assitantid:str = None, glob_filter:
                             (chunk.get("usage", {}) or {}).get("completion_tokens", 0) or 0
                         )
                         if "choices" in chunk and chunk.get("choices"):
-                            delta = (((chunk["choices"][0] or {}).get("delta") or {}).get("content"))
+                            delta = (((chunk.get("choices")[0] or {}).get("delta") or {}).get("content"))
                         elif "content" in chunk:
                             delta = chunk.get("content")
                     if delta:
