@@ -46,8 +46,8 @@ function parseScanText(text) {
 // "e05d7522-891a-416a-8bed-cbefc0c64209_A1xx_..." => "A1xx_..."
 function formatDoc(doc) {
   const s = String(doc || '')
-  // 匹配开头 UUID (8-4-4-4-12) 后面紧跟下划线或空格或破折号
-  const m = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})[ _-/]+/i
+  // 匹配开头 UUID (8-4-4-4-12) 后面紧跟下划线、空格、破折号或斜杠
+  const m = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})[ _\/-]+/i
   return s.replace(m, '')
 }
 

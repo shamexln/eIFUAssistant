@@ -13,7 +13,7 @@
   ],
   "lazyCodeLoading": "requiredComponents",
   "window": {
-    "navigationBarTitleText": "Gaia 小助手",
+    "navigationBarTitleText": "eIFU 小助手",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundTextStyle": "light"
