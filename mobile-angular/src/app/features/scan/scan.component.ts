@@ -46,6 +46,11 @@ import { Result } from '@zxing/library';
                       <div *ngIf="assistantid()">assistantid：{{ assistantid() }}</div>
                       <div *ngIf="containerid()">containerid：{{ containerid() }}</div>
                   </div>
+
+                  <div class="qr-holder" *ngIf="qrImageUrl()">
+                      <h3>已识别的二维码</h3>
+                      <img [src]="qrImageUrl()" alt="已识别的二维码"/>
+                  </div>
               </mat-card-content>
               <mat-card-actions>
                   <button mat-raised-button color="primary" (click)="goSearch()"
@@ -57,7 +62,7 @@ import { Result } from '@zxing/library';
   `,
   styles: [`
     .container { padding: 8px; }
-    .video-wrap { position: relative; width: 100%; aspect-ratio: 3/4; background: #000; border-radius: 8px; overflow: hidden; max-height: 50vh; }
+    .video-wrap { position: relative; width: 50%; margin: 0 auto; aspect-ratio: 3/4; background: #000; border-radius: 8px; overflow: hidden; max-height: 50vh; }
     /* 当已有识别结果时，进一步压缩预览区高度，避免出现滚动条 */
     .video-wrap.compact { max-height: 38vh; }
     video { width: 100%; height: 100%; object-fit: contain; }
@@ -66,11 +71,13 @@ import { Result } from '@zxing/library';
     .result, .resolve { margin-top: 8px; }
     .result h3, .resolve h3 { margin: 6px 0; font-size: 14px; }
     pre { white-space: pre-wrap; background: #f6f6f6; padding: 6px; border-radius: 6px; font-size: 12px; }
+    .qr-holder { margin-top: 8px; text-align: center; }
+    .qr-holder img { width: 200px; max-width: 80%; height: auto; display: block; margin: 4px auto; }
 
     /* Mobile fine-tuning to fit one screen on iPhone */
     @media (max-width: 430px) {
       mat-card-header, mat-card-content, mat-card-actions { padding: 8px !important; }
-      .video-wrap { aspect-ratio: 1/1; max-height: 44vh; }
+      .video-wrap { width: 80%; margin: 0 auto; aspect-ratio: 1/1; max-height: 44vh; }
       .video-wrap.compact { max-height: 34vh; }
       .actions button { padding: 6px 10px; min-width: 0; }
       .hint { font-size: 11px; }
@@ -83,8 +90,10 @@ export class ScanComponent implements OnDestroy {
   model = signal<string>('');
   assistantid = signal<string>('');
   containerid= signal<string>('');
+  qrImageUrl = signal<string>('');
   private codeReader = new BrowserMultiFormatReader();
   private controls: IScannerControls | null = null;
+  private navTimer: any = null;
 
   constructor(
     private readonly ifu: IfuService,
@@ -94,6 +103,14 @@ export class ScanComponent implements OnDestroy {
 
   async start() {
     try {
+      // reset previous state
+      this.qrImageUrl.set('');
+      this.scanAssistantidText.set('');
+      this.model.set('');
+      this.assistantid.set('');
+      this.containerid.set('');
+      if (this.navTimer) { clearTimeout(this.navTimer); this.navTimer = null; }
+
       this.scanning.set(true);
       const videoEl = document.getElementById('preview') as HTMLVideoElement;
       const controls = await this.codeReader.decodeFromVideoDevice(undefined, videoEl, (result, _err, _ctrl) => {
@@ -116,12 +133,18 @@ export class ScanComponent implements OnDestroy {
     this.scanning.set(false);
   }
 
-  ngOnDestroy() { this.stop(); }
+  ngOnDestroy() {
+    this.stop();
+    if (this.navTimer) { clearTimeout(this.navTimer); this.navTimer = null; }
+  }
 
   private onDecoded(result: Result) {
     this.stop();
     const text = result.getText();
     this.scanAssistantidText.set(text);
+    // 生成一个可显示的二维码图片（基于原始扫描文本）
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(text)}`;
+    this.qrImageUrl.set(qrUrl);
     this.handleText(text);
   }
 
@@ -211,6 +234,16 @@ export class ScanComponent implements OnDestroy {
     }
 
     this.ctx.setSelection({ model, assistantid, containerid });
+
+    // 如果成功拿到 assistantid 与 containerid，延迟跳转到检索页，给用户短暂时间查看二维码
+    if (assistantid && containerid) {
+      if (this.navTimer) { clearTimeout(this.navTimer); }
+      const delayMs = 1200; // 1.2s 延迟
+      this.navTimer = setTimeout(() => {
+        this.router.navigate(['/search']);
+        this.navTimer = null;
+      }, delayMs);
+    }
   }
 
   goSearch() {
