@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 import os
 import logging
 import json
+import threading
+from pathlib import Path
 
 from backend.gaia_client import call_gaia
 
@@ -371,3 +373,60 @@ def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Opt
 def get_content(doc_path: str, page: int = 1):
     # Local mock content has been removed; this endpoint is no longer supported.
     raise HTTPException(status_code=501, detail="本地模拟内容已移除：/get_content 不再提供服务，请改用 GAIA 检索与内容获取。")
+
+
+# =============================
+# Simple file-based voting
+# =============================
+class VoteRequest(BaseModel):
+    type: str = Field(..., description="投票类型：up 或 down")
+
+class VoteCounts(BaseModel):
+    up: int = 0
+    down: int = 0
+
+_votes_lock = threading.Lock()
+_votes_file = Path(__file__).with_name("votes.json")
+
+
+def _read_votes() -> VoteCounts:
+    try:
+        if not _votes_file.exists():
+            return VoteCounts(up=0, down=0)
+        data = json.loads(_votes_file.read_text(encoding="utf-8"))
+        up = int(data.get("up", 0))
+        down = int(data.get("down", 0))
+        return VoteCounts(up=up, down=down)
+    except Exception:
+        # If file corrupted, reset
+        return VoteCounts(up=0, down=0)
+
+
+def _write_votes(vc: VoteCounts):
+    tmp = _votes_file.with_suffix(".json.tmp")
+    data = {"up": int(vc.up), "down": int(vc.down)}
+    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(_votes_file)
+
+
+@app.get("/api/vote", response_model=VoteCounts)
+@app.get("/vote", response_model=VoteCounts)
+def get_votes():
+    with _votes_lock:
+        return _read_votes()
+
+
+@app.post("/api/vote", response_model=VoteCounts)
+@app.post("/vote", response_model=VoteCounts)
+def post_vote(req: VoteRequest):
+    t = (req.type or "").strip().lower()
+    if t not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="type 必须为 up 或 down")
+    with _votes_lock:
+        vc = _read_votes()
+        if t == "up":
+            vc.up += 1
+        else:
+            vc.down += 1
+        _write_votes(vc)
+        return vc

@@ -2,6 +2,16 @@
   "pages": [
     "pages/index/index"
   ],
+  "subpackages": [
+    {
+      "root": "packageA",
+      "name": "packageA",
+      "pages": [
+        "pages/demo/index"
+      ]
+    }
+  ],
+  "lazyCodeLoading": "requiredComponents",
   "window": {
     "navigationBarTitleText": "Gaia 小助手",
     "navigationBarBackgroundColor": "#ffffff",

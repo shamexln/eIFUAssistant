@@ -1,0 +1,6 @@
+<view class="container">
+  <view class="section">
+    <text class="title">示例分包页面</text>
+    <text class="desc">这是从分包 packageA 加载的页面，用于验证分包与懒加载已启用。</text>
+  </view>
+</view>

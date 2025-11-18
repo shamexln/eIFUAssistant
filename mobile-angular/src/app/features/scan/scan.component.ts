@@ -47,10 +47,6 @@ import { Result } from '@zxing/library';
                       <div *ngIf="containerid()">containerid：{{ containerid() }}</div>
                   </div>
 
-                  <div class="qr-holder" *ngIf="qrImageUrl()">
-                      <h3>已识别的二维码</h3>
-                      <img [src]="qrImageUrl()" alt="已识别的二维码"/>
-                  </div>
               </mat-card-content>
               <mat-card-actions>
                   <button mat-raised-button color="primary" (click)="goSearch()"

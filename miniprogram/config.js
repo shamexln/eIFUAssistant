@@ -1,4 +1,4 @@
 // 配置后端地址，开发时可指向本地局域网 IP，例如 http://192.168.1.5:9000
 module.exports = {
-  baseUrl: 'http://192.168.228.54:9000'
+  baseUrl: 'https://eifu.art'
 }

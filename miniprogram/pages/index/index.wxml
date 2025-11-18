@@ -2,28 +2,36 @@
   <!-- A: 扫码页面 -->
   <view class="section">
     <button class="btn" type="primary" bindtap="onScan">扫码定位设备说明书</button>
-    <view class="tip">设备型号：{{deviceModel || '—'}} </view>
-    <view class="tip">说明书路径：{{ifuPath || '—'}}</view>
+    <view class="tip">原始二维码：{{scanRawText || '—'}}</view>
+    <view class="tip">型号：{{model || '—'}}</view>
+    <view class="tip">assistantid：{{assistantid || '—'}}</view>
+    <view class="tip">containerid：{{containerid || '—'}}</view>
   </view>
 
-  <!-- B: 关键词搜索页 -->
+  <!-- B: 关键词搜索 -->
   <view class="section">
     <text class="label">关键词搜索</text>
     <input class="input" placeholder="请输入关键词" bindinput="onKeywordInput" />
-    <button class="btn" bindtap="onSearchIFU">搜索</button>
+    <button class="btn" type="primary" bindtap="onSearchIFU">搜索</button>
   </view>
 
   <view class="section" wx:if="{{results.length}}">
     <text class="label">搜索结果</text>
     <block wx:for="{{results}}" wx:key="index">
-      <view class="result-item" bindtap="onViewDetail" data-doc="{{item.doc}}" data-page="{{item.page}}">
-        <text class="doc">{{item.doc}} - 第{{item.page}}页</text>
+      <view class="result-item" bindtap="onViewDetail" data-snippet="{{item.snippet}}">
+        <text class="doc">{{item.docDisplay || item.doc}} - 第{{item.page}}页</text>
         <text class="snippet">{{item.snippet}}</text>
       </view>
     </block>
   </view>
 
-  <!-- C: 内容详情页（简化为浮层展示） -->
+  <!-- 分包演示入口 -->
+  <!-- <view class="section">
+    <button class="btn" type="default" bindtap="goToPkgDemo">打开分包示例页</button>
+    <view class="tip">该页面位于 packageA/pages/demo/index，将按需加载。</view>
+  </view> -->
+
+  <!-- C: 内容详情页（改为直接展示 snippet） -->
   <view class="detail-mask" wx:if="{{showDetail}}" bindtap="closeDetail">
     <view class="detail" catchtap="true">
       <view class="detail-title">内容详情</view>
@@ -33,23 +41,9 @@
       <button class="btn" bindtap="closeDetail">关闭</button>
     </view>
   </view>
-
-  <!-- 原有 Gaia 演示 -->
-  <view class="divider" />
-  <view class="section">
-    <text class="label">系统提示词（可选）</text>
-    <textarea class="input" placeholder="例如：你是一个有帮助的助手" auto-height bindinput="onSystemPromptInput" />
-  </view>
-
-  <view class="section">
-    <text class="label">输入你的问题</text>
-    <textarea class="input" placeholder="请输入内容" auto-height bindinput="onTextInput" />
-  </view>
-
-  <button class="btn" type="primary" loading="{{loading}}" bindtap="onSubmit" disabled="{{loading}}">发送</button>
-
-  <view class="section">
-    <text class="label">回复</text>
-    <view class="output">{{response}}</view>
+  <!-- D: 底部投票栏 -->
+  <view class="vote-bar">
+    <button class="vote-btn up" bindtap="onVoteUp">👍 喜欢 {{votes.up}}</button>
+    <button class="vote-btn down" bindtap="onVoteDown">👎 不喜欢 {{votes.down}}</button>
   </view>
 </view>
