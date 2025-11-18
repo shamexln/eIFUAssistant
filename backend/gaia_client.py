@@ -31,7 +31,7 @@ GAIA_BASE_URL_RAW = os.getenv("GAIA_BASE_URL", GAIA_BASE_URL_TEMPLATE)
 
 # Backward-compat placeholder; final URL is built at request time
 GAIA_BASE_URL = None
-MODEL_NAME = os.getenv("GAIA_MODEL", "GPT 4.1")
+MODEL_NAME = os.getenv("GAIA_MODEL", "GPT 5.1")
 TIMEOUT = int(os.getenv("GAIA_TIMEOUT", "60"))
 MAX_RETRY = int(os.getenv("GAIA_MAX_RETRY", "3"))
 BACKOFF_BASE = float(os.getenv("GAIA_BACKOFF_BASE", "1.5"))
@@ -269,6 +269,26 @@ def call_gaia(text: str, system_prompt: str, assistantid:str = None, glob_filter
                 completion_tokens = count_tokens(content)
             with _lock:
                 _used_tokens += int(completion_tokens or 0)
+
+            # Post-process: if Gaia returns JSON with a results list, sort by page ascending
+            # 需求：如果响应包含 results 且其中含有 page 字段，则按 page 升序返回给前端
+            if content:
+                try:
+                    parsed = json.loads(content)
+                    if isinstance(parsed, dict) and isinstance(parsed.get("results"), list):
+                        results = parsed.get("results")
+                        # 仅当元素为 dict 且存在 page 字段时进行排序；无法比较的置于末尾
+                        def _key(item):
+                            try:
+                                p = item.get("page") if isinstance(item, dict) else None
+                                return p if isinstance(p, (int, float)) else float('inf')
+                            except Exception:
+                                return float('inf')
+                        parsed["results"] = sorted(results, key=_key)
+                        content = json.dumps(parsed, ensure_ascii=False)
+                except Exception:
+                    # 非 JSON 或解析/排序失败时，保持原样
+                    pass
 
             if LOG_PAYLOADS:
                 logger.info("Gaia 返回内容: %s", _clip_for_log(content))

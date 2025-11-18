@@ -92,7 +92,25 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
     /* Wrap long titles and secondary lines */
     .result-list .mat-mdc-list-item-title, .result-list .mat-mdc-list-item-line { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
     .snippet { color: rgba(0,0,0,0.75); font-size: 12px; display: block; overflow-wrap: anywhere; word-break: break-word; white-space: pre-line; }
-    /* 放大镜样式 */
+
+    /* 强制覆盖 Angular Material MDC 列表在副文本上的省略号与不换行设置 */
+    :host ::ng-deep .result-list .mdc-list-item__secondary-text,
+    :host ::ng-deep .result-list .mat-mdc-list-item-line {
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+    }
+    :host ::ng-deep .result-list .mdc-list-item__primary-text,
+    :host ::ng-deep .result-list .mat-mdc-list-item-title {
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+    }
+  /* 放大镜样式 */
     .magnifier { position: fixed; z-index: 1000; max-width: 80vw; padding: 10px 12px; border-radius: 12px;
       background: rgba(255,255,255,0.98); box-shadow: 0 6px 20px rgba(0,0,0,0.25); border: 1px solid rgba(0,0,0,0.08);
       font-size: 22px; line-height: 1.35; color: #111; pointer-events: none; transform: translate(-50%, -110%);
