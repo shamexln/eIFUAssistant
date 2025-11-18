@@ -60,14 +60,7 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
           <div class="result" *ngIf="results().length || searched()">
             <h3>搜索结果（{{ results().length }}）</h3>
             <div class="empty" *ngIf="!results().length">未找到相关内容</div>
-            <mat-nav-list *ngIf="results().length" class="result-list"
-                          (touchstart)="startMagnifier($event)"
-                          (touchmove)="moveMagnifier($event)"
-                          (touchend)="endMagnifier()"
-                          (mousedown)="startMagnifierMouse($event)"
-                          (mousemove)="moveMagnifierMouse($event)"
-                          (mouseup)="endMagnifier()"
-                          (mouseleave)="endMagnifier()">
+            <mat-nav-list *ngIf="results().length" class="result-list">
               <mat-list-item *ngFor="let r of results(); let i = index" >
                 <span matListItemTitle>{{ r.doc }}</span>
                 <span matListItemLine>第 {{ r.page }} 页</span>
@@ -75,10 +68,6 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
                 <div matListItemLine class="snippet" *ngIf="r.snippet" [innerText]="r.snippet | unescapeNewlines"></div>
               </mat-list-item>
             </mat-nav-list>
-            <!-- 放大镜浮层（跟随手指/鼠标） -->
-            <div *ngIf="magVisible()" class="magnifier" [style.left.px]="magX()" [style.top.px]="magY()">
-              {{ magText() }}
-            </div>
           </div>
 
         </mat-card-content>
