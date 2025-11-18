@@ -37,7 +37,6 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
             已选 IFU 上下文：
             <ng-container *ngIf="ctx.selection(); else noCtx">
               {{ ctx.selection()?.model || '—' }}
-              {{ ctx.selection()?.ifuPath ? '(' + ctx.selection()?.ifuPath + ')' : '' }}
             </ng-container>
             <ng-template #noCtx>无（可先前往“扫码”定位）</ng-template>
           </mat-card-subtitle>
@@ -62,7 +61,7 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
             <div class="empty" *ngIf="!results().length">未找到相关内容</div>
             <mat-nav-list *ngIf="results().length" class="result-list">
               <mat-list-item *ngFor="let r of results(); let i = index" >
-                <span matListItemTitle>{{ r.doc }}</span>
+                <span matListItemTitle>{{ formatDoc(r.doc) }}</span>
                 <span matListItemLine>第 {{ r.page }} 页</span>
                 <!-- 使用 div 替代 markdown，按原样显示文本并保留换行 -->
                 <div matListItemLine class="snippet" *ngIf="r.snippet" [innerText]="r.snippet | unescapeNewlines"></div>
@@ -138,6 +137,15 @@ export class SearchComponent {
     public readonly ctx: IfuContextService,
     private readonly router: Router
   ) {}
+
+   // 格式化文档标题：移除前缀的 containerid（UUID 形式），例如：
+   // "e05d7522-891a-416a-8bed-cbefc0c64209_A1xx_..." => "A1xx_..."
+   formatDoc(doc: string) {
+        const s = String(doc || '')
+        // 匹配开头 UUID (8-4-4-4-12) 后面紧跟下划线、空格、破折号或斜杠
+        const m = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})[ _\/-]+/i
+        return s.replace(m, '')
+    }
 
   onSearch() {
     if (this.form.invalid) return;

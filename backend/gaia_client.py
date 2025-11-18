@@ -173,7 +173,8 @@ def call_gaia(text: str, system_prompt: str, assistantid:str = None, glob_filter
             {"role": "user", "content": text}
         ],
         "temperature": 0.1,
-        "max_tokens": MAX_RESPONSE_TOKENS
+        "max_tokens": MAX_RESPONSE_TOKENS,
+        "reasoningEffort": "Low"
     }
 
     if glob_filter:
