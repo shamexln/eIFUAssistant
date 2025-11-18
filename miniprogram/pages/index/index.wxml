@@ -11,7 +11,17 @@
   <!-- B: 关键词搜索 -->
   <view class="section">
     <text class="label">关键词搜索</text>
-    <input class="input" placeholder="请输入关键词" bindinput="onKeywordInput" />
+    <view class="input-row">
+      <input class="input flex" placeholder="请输入关键词（可按住右侧小喇叭语音输入）" value="{{keyword}}" bindinput="onKeywordInput" />
+      <view class="mic-btn {{recording ? 'recording' : ''}}"
+            bindtouchstart="startVoice"
+            bindtouchend="stopVoice"
+            bindtouchcancel="cancelVoice"
+            hover-class="mic-btn-hover">
+        <text>{{recording ? '🎙 说话中' : '🎤 语音'}}</text>
+      </view>
+    </view>
+    <view class="voice-tip">{{voiceSupported ? (recording ? '松开完成' : '按住说话') : '当前环境暂不支持语音输入'}}</view>
     <button class="btn" type="primary" bindtap="onSearchIFU">搜索</button>
   </view>
 

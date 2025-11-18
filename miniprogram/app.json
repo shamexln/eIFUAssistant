@@ -11,6 +11,12 @@
       ]
     }
   ],
+  "plugins": {
+    "WechatSI": {
+      "version": "0.3.6",
+      "provider": "wx069ba97219f66d99"
+    }
+  },
   "lazyCodeLoading": "requiredComponents",
   "window": {
     "navigationBarTitleText": "eIFU 小助手",
