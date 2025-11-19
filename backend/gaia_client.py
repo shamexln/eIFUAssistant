@@ -165,20 +165,38 @@ def call_gaia(text: str, system_prompt: str, assistantid:str = None, glob_filter
             _reset_session()
         _used_tokens += prompt_tokens
 
-    payload = {
-        "model": MODEL_NAME,
-        "stream": True,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text}
-        ],
-        "temperature": 0.1,
-        "max_tokens": MAX_RESPONSE_TOKENS,
-        "reasoningEffort": "Low"
-    }
+    # 如果有 assistantid，走 Assistant 接口
+    if assistantid:
+        # 对于 Assistant，一般不需要再传 model / ragConfig，
+        # 因为在 Web 里已经配置好了 model + Documents Tool + Container
+        payload = {
+            "assistantId": assistantid,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            "temperature": 0.1,
+            "max_tokens": MAX_RESPONSE_TOKENS,
+            "reasoningEffort": "Low"
+        }
+    else:
+        payload = {
+            "model": MODEL_NAME,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            "temperature": 0.1,
+            "max_tokens": MAX_RESPONSE_TOKENS,
+            "reasoningEffort": "Low"
+        }
 
-    if glob_filter:
-        payload["ragConfig"] = {"globFilter": glob_filter}
+        if glob_filter:
+            if "*" not in glob_filter and "?" not in glob_filter:
+                glob_filter = glob_filter.rstrip("/") + "/**"
+            payload["ragConfig"] = {"globFilter": glob_filter}
 
     if LOG_PAYLOADS:
            logger.info("请求 payload 内容: %s", payload)
