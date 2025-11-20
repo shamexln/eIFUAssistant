@@ -162,38 +162,56 @@ Page({
     this.setData({ keyword: e.detail.value })
   },
 
-  onSearchIFU() {
+  // 统一的 IFU 搜索请求方法，支持两种模式：'search' 与 'ask'
+  requestIfuSearch(mode) {
     const kw = (this.data.keyword || '').trim()
     if (!kw) {
       wx.showToast({ title: '请输入关键词', icon: 'none' })
       return
     }
-    if (!this.data.assistantid) {
-      wx.showToast({ title: '请先扫码或选择设备以定位说明书', icon: 'none' })
-      return
-    }
-    const url = `${baseUrl}/api/search_ifu?keyword=${encodeURIComponent(kw)}&assistantid=${encodeURIComponent(this.data.assistantid)}&containerid=${encodeURIComponent(this.data.containerid || '')}`
-    wx.showLoading({ title: '正在搜索...', mask: true })
+
+    // 与 Angular 行为对齐：assistantid/containerid 若存在则传，否则仅用关键词也可搜索
+    const params = [
+      `keyword=${encodeURIComponent(kw)}`,
+      `mode=${encodeURIComponent(mode)}`
+    ]
+    if (this.data.assistantid) params.push(`assistantid=${encodeURIComponent(this.data.assistantid)}`)
+    if (this.data.containerid) params.push(`containerid=${encodeURIComponent(this.data.containerid)}`)
+
+    const url = `${baseUrl}/api/search_ifu?${params.join('&')}`
+
+    const loadingTitle = mode === 'ask' ? '正在向AI提问...' : '正在搜索...'
+    wx.showLoading({ title: loadingTitle, mask: true })
     wx.request({
       url,
       method: 'GET',
       success: (res) => {
         const raw = (res.data && res.data.results) || []
-        // 移除 doc 前的 containerid（若存在）后再显示
         const results = raw.map(r => ({
           ...r,
           docDisplay: formatDoc(r && r.doc)
         }))
         this.setData({ results })
         if (!results.length) {
-          wx.showToast({ title: '未找到相关内容', icon: 'none' })
+          const emptyMsg = mode === 'ask' ? 'AI 暂无答案' : '未找到相关内容'
+          wx.showToast({ title: emptyMsg, icon: 'none' })
         }
       },
-      fail: () => wx.showToast({ title: '搜索失败', icon: 'none' }),
+      fail: () => wx.showToast({ title: (mode === 'ask' ? '提问失败' : '搜索失败'), icon: 'none' }),
       complete: () => {
         try { wx.hideLoading() } catch (e) {}
       }
     })
+  },
+
+  onSearchIFU() {
+    // 传统检索模式
+    this.requestIfuSearch('search')
+  },
+
+  // 新增：AI 问答模式，与 Angular 的 onAsk() 对齐
+  onAskIFU() {
+    this.requestIfuSearch('ask')
   },
 
   // 点击结果项，直接用 snippet 作为详情展示

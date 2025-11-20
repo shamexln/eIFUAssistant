@@ -303,3 +303,41 @@ server {
   - 开发环境：`mobile-angular/src/environments/environment.ts`
   - 生产环境：`mobile-angular/src/environments/environment.prod.ts`
 ## 使用deos vista300 support EAP-TLS?来测试多行
+Structured Output Schema on GAIA
+{
+"type": "object",
+"properties": {
+"results": {
+"type": "array",
+"description": "Document search results",
+"items": {
+"type": "object",
+"properties": {
+"doc": {
+"type": "string",
+"description": "Source document path or name"
+},
+"page": {
+"type": "integer",
+"description": "Page number in the source document"
+},
+"refId": {
+"type": "string",
+"description": "GAIA refId for citation"
+},
+"score": {
+"type": "number",
+"description": "Relevance score of this hit"
+},
+"snippet": {
+"type": "string",
+"description": "Original text snippet from the document"
+}
+},
+"required": ["doc", "page", "refId", "snippet"]
+}
+}
+},
+"required": ["results"]
+}
+

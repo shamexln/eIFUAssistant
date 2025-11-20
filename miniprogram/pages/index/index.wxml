@@ -23,6 +23,7 @@
     </view>
     <view class="voice-tip">{{voiceSupported ? (recording ? '松开完成' : '按住说话') : '当前环境暂不支持语音输入'}}</view>
     <button class="btn" type="primary" bindtap="onSearchIFU">搜索</button>
+    <button class="btn" type="primary" bindtap="onAskIFU">问AI</button>
   </view>
 
   <view class="section" wx:if="{{results.length}}">
