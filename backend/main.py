@@ -8,7 +8,7 @@ import json
 import threading
 from pathlib import Path
 
-from backend.gaia_client import call_gaia
+from .gaia_client import call_gaia, call_ifu_search, call_atlan_qa
 
 logger = logging.getLogger("api")
 LOG_PAYLOADS = os.getenv("GAIA_LOG_PAYLOADS", "true").lower() in ("1", "true", "yes", "on")
@@ -41,6 +41,7 @@ DEFAULT_SYSTEM_PROMPT = os.getenv("DEFAULT_SYSTEM_PROMPT", "你是一个有帮�
 class GaiaRequest(BaseModel):
     text: str = Field(..., description="用户输入的文本")
     system_prompt: str | None = Field(None, description="系统提示词，可选")
+    assistantId: str | None = Field(None, description="GAIA 助手/Agent ID；如果提供，将走 Assistant 路线（推荐）")
 
 
 class GaiaResponse(BaseModel):
@@ -75,208 +76,137 @@ def favicon():
     return Response(status_code=204)
 
 
-@app.post("/api/gaia", response_model=GaiaResponse)
-def api_gaia(req: GaiaRequest):
-    text = (req.text or "").strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="text 不能为空")
-    """ system_prompt = (req.system_prompt or DEFAULT_SYSTEM_PROMPT).strip() """
-    system_prompt = """
-                    If the user asks for anything similar to "Vista" , "Vista 120" ," Vista 300" , "Imprivata", "Epic" ,you must always look up in "knowledge and information about the Vista patient monitor" containers Citable tools allow you to cite external tool sources in your text.
-                     To cite a source, follow these steps:
-                    Append a footnote marker that you should never escape [^refId] (for example [^1]).
-                    - immediately following the relevant information. You find the refId in the search result you are referring to.
-                     At the end of the text, include the footnote details corresponding to each marker.
-                     Ensure these footnotes are also formatted correctly in Markdown, using the syntax [^refId]: refSummary (e.g., [^1]: source summary) .
-                     Replace refSummary with a very short summary (about less than 8 words, do not multline!) of the information source within the search result. An example format:
-
-                    Lorem ipsum dolores[^1].
-
-                    [^1]: source summary
+# =============================
+# Documents Tool 专用端点
+# =============================
+from typing import Optional, Any
 
 
-                    # Document Tools (RAG, Grep, GetContent, List, ReadImage)
-
-                    Use document tools for accessing internal Dräger documents, handbooks, and any content uploaded to knowledge containers:
-
-                    ## document_rag_search
-
-                    Use this tool to search through uploaded documents, knowledge containers, and organizational content. This tool should
-                    be used to retrieve relevant information that
-                    helps answer the user's question with proper citations.
-
-                    Use for initial document discovery and filtering:
-
-                    - Performs semantic search across all uploaded documents and knowledge containers
-                    - Returns relevant passages with content and embedded images
-                    - Best for finding relevant documents before deeper investigation
-                    - Returns refId for citations
-
-                    When you use document_rag_search, the results will include:
-
-                    - **content**: The textual content from the matching pages
-                    - **images**: An array of images found on those pages (diagrams, charts, screenshots, etc.)
-
-                    You should analyze both the textual content AND the images array to provide comprehensive answers. Images may contain
-                    critical information like diagrams, flowcharts, screenshots, or data visualizations that complement or extend the text.
-
-                    When you search documents, you will receive results with refId markers. You use these refId markers for citations when
-                    referencing document content.
-
-                    @knowledgecontainers.attached.description
-
-                    IMPORTANT: You MUST cite document sources using the refId system whenever you reference information from documents.
-
-                    Examples of document_rag_search usage:
-
-                    * Simple search: {\"query\": \"quarterly revenue\"}
-                    * Specific container or file: {\"query\": \"budget allocation\", \"globFilter\": \"KC-123/Budget_2025.pdf\"}
-
-                    ## document_list
-
-                    Use this tool to view an inventory of the files you have access to.
-                    • Purpose: discover file IDs/paths, verify existence, or narrow a large set of files by name pattern before running
-                    other tools.
-                    • Returns: JSON with `total` count and `results[]` objects (`Id`, `Path`, `TokenCount`, `PageNumbers`).
-
-                    Parameters
-                    `globFilter` (string, optional): glob expression for paths (supports `**`, `?`, brace expansion, quotes for spaces, and
-                    `!` negation; use `<KC-ID>/path/**` to target specific containers). If no files match and the filter contains unquoted
-                    spaces or parentheses, the tool automatically retries the literal path (and a quoted pattern) before failing.
-                    `offset` (int, optional): paging start index (default 0).
-                    `limit`  (int, optional): max entries to return (default 30, keep ≤ 10 when possible).
-
-                    Example: `{\"globFilter\": \"docs/**/*.md !**/draft/*\", \"offset\": 0, \"limit\": 5}`
-
-                    ---
-
-                    ## document_grep_search
-
-                    Use this tool to find *exact* text or regex patterns inside documents.
-                    You can use this tool to search for specific text or patterns in documents, such as log entries, code snippets, or other
-                    exact phrases. This can be useful for identifying specific content within documents, to later use the get_content tool
-                    to retrieve the relevant passages.
-
-                    Parameters
-                    `pattern` (string, required): ECMA-regex pattern, case-insensitive.
-                    `globFilter` (string, optional): glob expression for documents (supports `**`, `?`, brace expansion, quotes for spaces,
-                    and `!` negation; accepts `<KC-ID>/path` prefixes or direct document IDs). If no documents match and the filter has
-                    unquoted spaces or parentheses, the tool falls back to the literal path (and a quoted pattern) before reporting an
-                    error.
-
-                    Best Practices
-                    • Keep the regex tight to avoid large outputs; the tool stops after ~10 matches.
-                    • Pair with `globFilter` to restrict by filename or container and avoid scanning huge corpora.
-                    • Respect token budget; if results look too big, refine or ask the user.
-                    • Searches for exact text or regex patterns within documents
-                    • Useful for finding specific log entries, error codes, or exact terminology
-                    • Returns matches with document context
-                    • Limit searches with precise glob filters (e.g. `<KC-ID>/reports/**/*.pdf`) to avoid token overflow
-
-                    Example:
-                    `{\"pattern\": \"error\\\\s+\\\\d{3}\", \"globFilter\": \"KC-ProdLogs/logs/**/*.log\"}`
-
-                    ---
-
-                    ## document_get_content
-
-                    Use for deep research after identifying relevant documents:
-
-                    - Retrieves complete pages or sections from known documents
-                    - Returns both textual content and images from specified pages
-                    - Essential for comprehensive analysis and detailed quotations
-                    - Always returns refId for proper citation
-                    - Use after RAG search has identified relevant documents or when the user specifies exact pages
-
-                    When you use document_get_content, the results will include:
-
-                    - `content`: The textual content from the pages
-                    - `refId`: Citation reference ID for this content
-                    - `id`: Document ID
-                    - `containerName`: Knowledge container name (if applicable)
-                    - `sourceFile`: Full path to the source file (format: "{containerId}/{path}")
-                    - `sourcePage`: Page number where content starts
-                    - `selectedLineCount`: Number of lines returned (after applying offset/limit)
-                    - `totalLineCount`: Total lines available on the page
-                    - `tokenCount`: Token count of the content
-                    - `images`: Array of `ImageInfo` objects with `documentId` and `altText` for images on those pages
-
-                    **IMPORTANT: Image Content in Results**
-                    The results from document_get_content will include:
-
-                    - **content**: The textual content from the specified pages
-                    - **images**: An array of images found on those pages (diagrams, charts, screenshots, etc.)
-
-                    You should analyze both the textual content AND the images array to provide comprehensive answers. Images may contain
-                    critical information like diagrams, flowcharts, screenshots, or data visualizations that complement or extend the text.
-
-                    ⏺ document_read_image Tool
-
-                    Use document_read_image to analyze and display images from documents:
-
-                    - Accepts both document IDs (from internal documents) and URLs (from web sources)
-                    - Essential when document search results include images that contain important information
-
-                    When to use:
-
-                    - Documents contain diagrams/charts crucial for understanding
-                    - Visual content needs to be analyzed for text extraction
-                    - Images from RAG search or get_content need to be displayed
-
-                    Example usage:
-                    {"documentId": "doc_12345"}
-                    // or
-                    {"url": "https://example.com/diagram.png"}
-
-                    Display format: ![description](AccessUrl)
+class DocSearchResultItem(BaseModel):
+    doc: str
+    page: int
+    refId: str
+    snippet: str
 
 
-                    # Citations and refId Usage
+class DocSearchRequest(BaseModel):
+    query: str = Field(..., description="用户输入的检索关键词或问题")
+    globFilter: Optional[str] = Field(None, description="限定的 GAIA 知识容器或文件，如 '<KC-ID>/**'")
+    assistantId: Optional[str] = Field(None, description="GAIA 助手 ID（已绑定容器时可传），可与 globFilter 同时使用")
 
-                    Critical: Always cite sources when information comes from documents or web searches.
 
-                    Citation Format:
+class DocSearchResponse(BaseModel):
+    results: list[DocSearchResultItem]
 
-                    - Single reference: [cite:135]
-                    - Multiple references: [cite:12,32,45]
-                    - Never write URLs directly - always use refId citations
 
-                    When citations are required:
+@app.post("/api/doc_search", response_model=DocSearchResponse)
+def doc_search(req: DocSearchRequest):
+    q = (req.query or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="query 不能为空")
 
-                    - Any factual claim from external sources
-                    - Information from internal documents
-                    - Data, statistics, or specific findings
-                    - Direct quotes or paraphrased content
+    # 系统提示：显式要求使用 Documents 搜索，并严格输出 JSON（仅结构，不要其它文字）
+    system_prompt = (
+        "你是文档检索与结构化助手。\n"
+        "必须使用 GAIA 的 Documents 搜索工具（document_rag_search 或后端已集成的 RAG 能力），\n"
+        "仅在 ragConfig.globFilter 指定的容器/文档范围内检索（若提供）。\n"
+        "严格返回 JSON，且只返回如下结构，不要任何多余文字：\n"
+        "{\"results\":[{\"doc\":string,\"page\":number,\"refId\":string,\"snippet\":string}]}\n"
+        "要求：\n"
+        "- doc: 使用来源的 sourceFile 或文档可辨识名称；\n"
+        "- page: 使用命中内容的页码；\n"
+        "- refId: 使用检索结果中的 refId；\n"
+        "- snippet: 直接使用命中文本片段，不要改写与翻译，可包含换行；\n"
+        "- 只返回与问题强相关的若干条记录。\n"
+    )
 
-                    Citation UI Elements:
-
-                    - Citations create clickable chips for users
-                    - Users can jump directly to source documents or open web pages
-                    - All tools that return refId must be cited for verification and transparency
-
-                    Best Practices:
-
-                    - Include all relevant sources for fact verification
-                    - When multiple sources support a claim, cite all of them
-                    - For contested information, cite conflicting sources
-                    - Ensure traceability of all non-trivial information
-                    """.strip()
-
-    if LOG_PAYLOADS:
-        logger.info("API 收到请求: 用户输入=%s | 系统提示词=%s", _clip_for_log(text), _clip_for_log(system_prompt))
     try:
-        content = call_gaia(text=text, system_prompt=system_prompt, glob_filter="41f4f2b3-4ae1-42f3-b824-b7430ffb45c5")
-        if LOG_PAYLOADS:
-            logger.info("API 返回给前端的内容: %s", _clip_for_log(content))
-        return GaiaResponse(content=content)
-    except HTTPException as e:
-        # Pass through but also log
-        logger.warning("API 转发异常: %s", getattr(e, "detail", e))
+        content = call_gaia(
+            text=q,
+            system_prompt=system_prompt,
+            assistantid=(req.assistantId or os.getenv("GAIA_ASSISTANT_ID")),
+            glob_filter=req.globFilter,
+        )
+    except HTTPException:
         raise
     except Exception as e:
-        logger.exception("API 内部错误: %s", e)
-        # hide internal detail from client
+        logger.exception("doc_search 上游错误: %s", e)
         raise HTTPException(status_code=502, detail="上游服务异常，请稍后再试。") from e
+
+    # 解析 JSON；若非 JSON，返回空数组以保证前端稳定
+    results: list[DocSearchResultItem] = []
+    if content:
+        try:
+            data = json.loads(content)
+            if isinstance(data, dict):
+                arr = data.get("results", [])
+            elif isinstance(data, list):
+                arr = data
+            else:
+                arr = []
+
+            for it in arr or []:
+                if not isinstance(it, dict):
+                    continue
+                # 灵活兜底字段名，保证 doc/page/refId/snippet 存在
+                doc = (
+                    it.get("doc")
+                    or it.get("sourceFile")
+                    or it.get("id")
+                    or ""
+                )
+                page = (
+                    it.get("page")
+                    or it.get("sourcePage")
+                    or 1
+                )
+                ref_id = it.get("refId") or it.get("refID") or ""
+                snippet = it.get("snippet") if it.get("snippet") is not None else it.get("content")
+                # 严格不修改 snippet 内容
+                if not isinstance(snippet, str):
+                    continue
+                try:
+                    page_int = int(page)
+                except Exception:
+                    page_int = 1
+                if not isinstance(doc, str):
+                    doc = str(doc)
+                if not isinstance(ref_id, str):
+                    ref_id = str(ref_id)
+                results.append(DocSearchResultItem(doc=doc, page=page_int, refId=ref_id, snippet=snippet))
+        except Exception as e:
+            logger.warning("doc_search 返回非 JSON 或解析失败: %s", e)
+
+    return DocSearchResponse(results=results)
+
+
+class FormatSnippetsRequest(BaseModel):
+    items: list[dict] = Field(default_factory=list, description="包含 doc/page/refId/snippet 字段的列表")
+
+
+@app.post("/api/format_snippets", response_model=DocSearchResponse)
+def format_snippets(req: FormatSnippetsRequest):
+    # 不修改 snippet 文本，仅按目标结构组织
+    results: list[DocSearchResultItem] = []
+    for it in req.items:
+        if not isinstance(it, dict):
+            continue
+        doc = it.get("doc") or it.get("sourceFile") or it.get("id") or ""
+        page = it.get("page") or it.get("sourcePage") or 1
+        ref_id = it.get("refId") or it.get("refID") or ""
+        snippet = it.get("snippet") if it.get("snippet") is not None else it.get("content")
+        if not isinstance(snippet, str):
+            continue
+        try:
+            page_int = int(page)
+        except Exception:
+            page_int = 1
+        if not isinstance(doc, str):
+            doc = str(doc)
+        if not isinstance(ref_id, str):
+            ref_id = str(ref_id)
+        results.append(DocSearchResultItem(doc=doc, page=page_int, refId=ref_id, snippet=snippet))
+    return DocSearchResponse(results=results)
 
 
 # Run (Windows recommended): python -m uvicorn backend.main:app --reload --port 9000
@@ -320,7 +250,7 @@ def get_ifu(model: str):
 
 @app.get("/search_ifu")
 @app.get("/api/search_ifu")
-def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Optional[str] = None):
+def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Optional[str] = None, mode: Optional[str] = None):
     keyword = (keyword or "").strip()
     if not keyword:
         raise HTTPException(status_code=400, detail="keyword 不能为空")
@@ -338,7 +268,14 @@ def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Opt
             "输出格式: {\"results\":[{\"doc\":string,\"page\":number,\"refId\":string,\"score\":number,\"snippet\":string}]}\n"
             "要求: 每条 snippet 300–800字，允许换行与标点；尽量接近上限；若无法确定页码，使用1；返回最多1000条。"
         )
-        content = call_gaia(text=f"keyword: {keyword}", system_prompt=system_prompt, assistantid=assistantID, glob_filter=containerid)
+        # 根据前端传入的 mode 决定调用后端能力：
+        # - mode=="ask" 走问答：call_atlan_qa(question=keyword, assistantid=assistantID)
+        # - 其它（含未提供）走搜索：call_ifu_search(keyword=f"keyword: {keyword}", assistantid=assistantID, container_id=containerid)
+        call_mode = (mode or "").strip().lower()
+        if call_mode == "ask":
+            content = call_atlan_qa(question=keyword, assistantid=assistantID, mode=mode)
+        else:
+            content = call_ifu_search(keyword=keyword, assistantid=assistantID, container_id=containerid, mode=mode)
         if content:
             try:
                 data = json.loads(content)
@@ -347,18 +284,19 @@ def search_ifu(keyword: str, assistantid: Optional[str] = None, containerid: Opt
                 valid = []
                 for it in results:
                     doc = str(it.get("doc", assistantID)).strip() if isinstance(it, dict) else ""
-                    page = int(it.get("page", 1)) if isinstance(it, dict) else 1
+                    page = int(it.get("page", 0)) if isinstance(it, dict) else 0
                     snippet = str(it.get("snippet", "")).strip() if isinstance(it, dict) else ""
                     if doc:
                         valid.append({
                             "doc": doc,
-                            "page": max(1, page),
+                            "page": max(0, page),
                             "snippet": snippet[:3000]
                         })
                 return {"results": valid}
             except Exception:
-                # If GAIA returns non-JSON, surface empty results
-                return {"results": []}
+                # If upstream returns non-JSON, 为了兼容前端，包装为一条记录（使用 assistantID 作为 doc，page=0）
+                snippet = str(content) if content is not None else ""
+                return {"results": [{"doc": assistantID, "page": 0, "snippet": snippet[:3000]}]}
         return {"results": []}
     except HTTPException:
         # bubble up GAIA auth errors, etc.

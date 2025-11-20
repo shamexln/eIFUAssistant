@@ -153,6 +153,282 @@ def _parse_gaia_response(data: Dict[str, Any]) -> str:
         return (data["choices"][0].get("message", {}) or {}).get("content", "").strip()
     raise RuntimeError("Unexpected Gaia response format")
 
+def _call_gaia_core(
+    text: str,
+    system_prompt: str,
+    assistantid: str | None = None,
+    glob_filter: str | None = None,
+    mode: Optional[str] = None
+) -> str:
+    logger.info(f"本批 prompt:\n{system_prompt}")
+    global _used_tokens
+    prompt_tokens = count_tokens(text) + count_tokens(system_prompt) + 50
+
+    with _lock:
+        if _used_tokens + prompt_tokens + MAX_RESPONSE_TOKENS >= SESSION_TOKEN_LIMIT:
+            logger.info("Token limit reached, resetting session.")
+            _reset_session()
+        _used_tokens += prompt_tokens
+
+    call_mode = (mode or "").strip().lower()
+    # 1) 构造 payload
+    if call_mode == "ask":
+        # 走 Assistant 接口：model / tools / containers 都在助手里配置好了
+        payload: dict[str, Any] = {
+            "assistantId": assistantid,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            "temperature": 0,
+            "max_tokens": MAX_RESPONSE_TOKENS,
+        }
+        # 一般不再传 ragConfig，避免覆盖助手的容器设置
+        # 如确实要按文件再细分，可以在这里按需开启
+        # if glob_filter:
+        #     if "*" not in glob_filter and "?" not in glob_filter:
+        #         glob_filter = glob_filter.rstrip("/") + "/**"
+        #     payload["ragConfig"] = {"globFilter": glob_filter}
+    else:
+        # 裸模型调用
+        payload = {
+            "model": MODEL_NAME,
+            "assistantId": assistantid,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            "temperature": 0.1,
+            "max_tokens": MAX_RESPONSE_TOKENS,
+            "reasoningEffort": "Low",
+        }
+        if glob_filter:
+            if "*" not in glob_filter and "?" not in glob_filter:
+                glob_filter = glob_filter.rstrip("/") + "/**"
+            payload["ragConfig"] = {"globFilter": glob_filter}
+
+    if LOG_PAYLOADS:
+        logger.info("请求 payload 内容: %s", payload)
+
+    err = None
+    for attempt in range(1, MAX_RETRY + 1):
+        try:
+            logger.debug(f"Calling Gaia, attempt {attempt}")
+            url = _build_gaia_url(assistantid)
+            logger.debug(f"Resolved Gaia URL: {url}")
+
+            resp = _session_obj.post(url, json=payload, timeout=TIMEOUT, stream=True)
+            resp.raise_for_status()
+
+            ctype = (resp.headers.get("Content-Type") or "").lower()
+            charset = "utf-8"
+            if "charset=" in ctype:
+                try:
+                    charset = (ctype.split("charset=")[-1].split(";")[0] or "utf-8").strip()
+                except Exception:
+                    charset = "utf-8"
+            try:
+                resp.encoding = charset
+            except Exception:
+                pass
+            is_sse = "text/event-stream" in ctype
+
+            accumulated: list[str] = []
+            completion_tokens = 0
+
+            if is_sse:
+                logger.debug("Parsing SSE stream from Gaia…")
+                for raw_line in resp.iter_lines(decode_unicode=False):
+                    if not raw_line:
+                        continue
+                    try:
+                        line = raw_line.decode(charset, errors="replace").strip()
+                    except Exception:
+                        try:
+                            line = raw_line.decode("utf-8", errors="replace").strip()
+                        except Exception:
+                            continue
+                    if not line.startswith("data:"):
+                        continue
+                    payload_str = line[5:].strip()
+                    if payload_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(payload_str)
+                    except Exception:
+                        continue
+
+                    delta = None
+                    if isinstance(chunk, dict):
+                        completion_tokens += int(
+                            chunk.get("completionTokenCount")
+                            or (chunk.get("usage", {}) or {}).get("completion_tokens", 0)
+                            or 0
+                        )
+                        if "choices" in chunk and chunk.get("choices"):
+                            delta = (((chunk.get("choices")[0] or {}).get("delta") or {}).get("content"))
+                        elif "content" in chunk:
+                            delta = chunk.get("content")
+                    if delta:
+                        accumulated.append(str(delta))
+
+                content = ("".join(accumulated)).strip()
+            else:
+                data = resp.json()
+                completion_tokens = int(
+                    data.get("completionTokenCount")
+                    or (data.get("usage", {}) or {}).get("completion_tokens", 0)
+                    or 0
+                )
+                content = _parse_gaia_response(data)
+
+            if not completion_tokens and content:
+                completion_tokens = count_tokens(content)
+            with _lock:
+                _used_tokens += int(completion_tokens or 0)
+
+            # 如果是 JSON 且有 results.page，就按 page 排序
+            if content:
+                try:
+                    parsed = json.loads(content)
+                    if isinstance(parsed, dict) and isinstance(parsed.get("results"), list):
+                        results = parsed["results"]
+
+                        def _key(item):
+                            try:
+                                p = item.get("page") if isinstance(item, dict) else None
+                                return p if isinstance(p, (int, float)) else float("inf")
+                            except Exception:
+                                return float("inf")
+
+                        parsed["results"] = sorted(results, key=_key)
+                        content = json.dumps(parsed, ensure_ascii=False)
+                except Exception:
+                    pass
+
+            if LOG_PAYLOADS:
+                logger.info("Gaia 返回内容: %s", _clip_for_log(content))
+            return content
+
+        except (requests.ReadTimeout, requests.ConnectionError) as e:
+            err = f"{type(e).__name__}"
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response is not None else None
+            if LOG_PAYLOADS and e.response is not None:
+                try:
+                    body = e.response.text
+                except Exception:
+                    body = "<unreadable body>"
+                logger.warning("Gaia 上游返回错误: HTTP %s, body=%s", status, _clip_for_log(body))
+            if status in (401, 403):
+                logger.error("Upstream auth failed (HTTP %s).", status)
+                raise HTTPException(status_code=401, detail="上游鉴权失败，请检查 GAIA_API_KEY 或权限是否正确。") from e
+            if status not in (429, 500, 502, 503, 504):
+                logger.error(f"HTTP error: {status}")
+                raise
+            err = f"HTTP {status}"
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+
+        if attempt == MAX_RETRY:
+            logger.error(f"Gaia call failed after {MAX_RETRY} attempts: {err}")
+            break
+        wait = BACKOFF_BASE ** attempt
+        logger.warning(f"{err}, retry {attempt}/{MAX_RETRY} in {wait}s …")
+        print(f"[warn] {err}, retry {attempt}/{MAX_RETRY} in {wait}s …")
+        time.sleep(wait)
+
+    return PLACEHOLDER
+
+
+def call_atlan_qa(question: str, assistantid: str,mode: Optional[str] = None) -> str:
+    """
+    用 Atlan eIFU 助手做自然语言问答。
+    需求：将原本返回的自由文本转换为固定结构的 JSON 字符串：
+    {"results":[{"doc":string,"page":number,"refId":string,"score":number,"snippet":string}]}
+
+    为保持兼容：
+    - 若上游已经返回符合该结构的 JSON，则原样返回；
+    - 否则将自由文本包装进上述 schema 中，字段按以下规则填充：
+        doc -> assistantid；page -> 1；refId -> 随机UUID；score -> 1.0；snippet -> 上游文本。
+    """
+
+    system_prompt = (
+        "你是 eIFU 助手。\n"
+        "任务：\n"
+        "1）把用户输入当作关键字在绑定的 IFU 文档中检索；\n"
+        "2）先在绑定的 IFU 文档中检索相关内容，不要输出任何多余的文字或解释；\n"
+        "3）用自然语言回答问题，如果有明确页码或章节，顺便在回答中说明；\n"
+        "4）如果文档中找不到相关内容，就明确说“在 eIFU 中未找到相关内容”。"
+    )
+    raw = _call_gaia_core(
+        text=question,
+        system_prompt= "",
+        assistantid=assistantid,
+        glob_filter=None,  # 容器在助手里已经绑定好了
+        mode=mode
+    )
+
+    # 如果已经是目标结构的 JSON，直接透传
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict) and isinstance(parsed.get("results"), list):
+            return raw
+    except Exception:
+        pass
+
+    # 否则进行包装
+    try:
+        snippet = "" if raw is None else str(raw)
+    except Exception:
+        snippet = "<unprintable>"
+
+    wrapped = {
+        "results": [
+            {
+                "doc": str(assistantid or "atlan-eifu"),
+                "page": 0, # skip this, frontend will not show it
+                "refId": str(uuid.uuid4()),
+                "score": 1.0,
+                "snippet": snippet,
+            }
+        ]
+    }
+    return json.dumps(wrapped, ensure_ascii=False)
+
+
+def call_ifu_search(keyword: str, assistantid: str | None = None, container_id: str | None = None, mode: Optional[str] = None) -> str:
+    """
+    调用 IFU 搜索助手，返回 JSON：
+    {"results":[{"doc":..., "page":..., "refId":..., "score":..., "snippet":...}]}
+    注意：结构由 GAIA 助手的 Structured Output Schema 保证。
+    """
+
+    system_prompt = (
+        "你是医疗设备说明书检索助手。仅在 ragConfig.globFilter 指定的 IFU 文档中检索。\n"
+        "根据用户关键词返回严格的 JSON（仅 JSON，无多余文字）。\n"
+        "snippet 必须为原文截取：以命中关键词为中心，向前后扩展若干句，尽量接近长度上限。\n"
+        "输出格式: {\"results\":[{\"doc\":string,\"page\":number,\"refId\":string,\"score\":number,\"snippet\":string}]}\n"
+        "要求: 每条 snippet 300–800字，允许换行与标点；尽量接近上限；若无法确定页码，使用1；返回最多1000条。"
+    )
+
+    # 通常不需要再传 ragConfig，容器已在助手配置中绑定。
+    # 如你想强行限定某个容器，可以传 container_id -> ragConfig，
+    # 但要确保不会和助手的默认设置冲突。
+    glob_filter = None
+    if container_id:
+        glob_filter = container_id  # 内部会自动加上 /**
+
+    return _call_gaia_core(
+        text=keyword,
+        system_prompt=system_prompt,
+        assistantid=assistantid,
+        glob_filter=glob_filter,
+        mode=mode
+    )
+
 
 def call_gaia(text: str, system_prompt: str, assistantid:str = None, glob_filter: str = None) -> str:
     logger.info(f"本批 prompt:\n{system_prompt}")
@@ -180,6 +456,11 @@ def call_gaia(text: str, system_prompt: str, assistantid:str = None, glob_filter
             "max_tokens": MAX_RESPONSE_TOKENS,
             "reasoningEffort": "Low"
         }
+        # 允许在 Assistant 调用时也传递 ragConfig.globFilter，以便按容器/文件过滤
+        if glob_filter:
+            if "*" not in glob_filter and "?" not in glob_filter:
+                glob_filter = glob_filter.rstrip("/") + "/**"
+            payload["ragConfig"] = {"globFilter": glob_filter}
     else:
         payload = {
             "model": MODEL_NAME,

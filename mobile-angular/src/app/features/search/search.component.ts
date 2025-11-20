@@ -49,6 +49,7 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
               <mat-error *ngIf="form.controls.keyword.hasError('required')">请输入关键词</mat-error>
             </mat-form-field>
             <div class="actions">
+              <button mat-raised-button color="primary" type="button" (click)="onAsk()" [disabled]="loading() || form.invalid">问AI</button>
               <button mat-raised-button color="primary" type="submit" [disabled]="loading() || form.invalid">搜索</button>
               <button mat-button type="button" (click)="goScan()">去扫码</button>
             </div>
@@ -62,7 +63,7 @@ import { UnescapeNewlinesPipe } from './unescape-newlines.pipe';
             <mat-nav-list *ngIf="results().length" class="result-list">
               <mat-list-item *ngFor="let r of results(); let i = index" >
                 <span matListItemTitle>{{ formatDoc(r.doc) }}</span>
-                <span matListItemLine>第 {{ r.page }} 页</span>
+                <span matListItemLine *ngIf="r.page != 0">第 {{ r.page }} 页</span>
                 <!-- 使用 div 替代 markdown，按原样显示文本并保留换行 -->
                 <div matListItemLine class="snippet" *ngIf="r.snippet" [innerText]="r.snippet | unescapeNewlines"></div>
               </mat-list-item>
@@ -158,12 +159,35 @@ export class SearchComponent {
     this.results.set([]);
     this.searched.set(true);
 
-    this.ifu.searchIfu(kw, assistantid, containerid).subscribe({
+    this.ifu.searchIfu(kw, assistantid, containerid, 'search').subscribe({
       next: (res) => {
         this.results.set(res?.results || []);
       },
       error: (err) => {
         console.error('searchIfu error', err);
+        this.results.set([]);
+      },
+      complete: () => this.loading.set(false)
+    });
+  }
+
+  onAsk() {
+    if (this.form.invalid) return;
+    const kw = this.form.getRawValue().keyword.trim();
+    if (!kw) return;
+    const assistantid = this.ctx.selection()?.assistantid || undefined;
+    const containerid = this.ctx.selection()?.containerid || undefined;
+
+    this.loading.set(true);
+    this.results.set([]);
+    this.searched.set(true);
+
+    this.ifu.searchIfu(kw, assistantid, containerid, 'ask').subscribe({
+      next: (res) => {
+        this.results.set(res?.results || []);
+      },
+      error: (err) => {
+        console.error('searchIfu(ask) error', err);
         this.results.set([]);
       },
       complete: () => this.loading.set(false)

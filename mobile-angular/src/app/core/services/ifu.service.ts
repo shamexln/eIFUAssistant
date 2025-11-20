@@ -33,10 +33,11 @@ export class IfuService {
     return this.http.get<GetIfuResponse>(`${this.base}/api/get_ifu`, { params });
   }
 
-  searchIfu(keyword: string, assistantid?: string, containerid?: string): Observable<SearchIfuResponse> {
+  searchIfu(keyword: string, assistantid?: string, containerid?: string, mode?: 'ask' | 'search'): Observable<SearchIfuResponse> {
     let params = new HttpParams().set('keyword', keyword);
     if (assistantid) params = params.set('assistantid', assistantid);
     if (containerid) params = params.set('containerid', containerid);
+    if (mode) params = params.set('mode', mode);
     return this.http.get<SearchIfuResponse>(`${this.base}/api/search_ifu`, { params });
   }
 
