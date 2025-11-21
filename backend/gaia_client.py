@@ -178,7 +178,6 @@ def _call_gaia_core(
             "assistantId": assistantid,
             "stream": True,
             "messages": [
-                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text},
             ],
             "temperature": 0,
@@ -355,14 +354,6 @@ def call_atlan_qa(question: str, assistantid: str,mode: Optional[str] = None) ->
         doc -> assistantid；page -> 1；refId -> 随机UUID；score -> 1.0；snippet -> 上游文本。
     """
 
-    system_prompt = (
-        "你是 eIFU 助手。\n"
-        "任务：\n"
-        "1）把用户输入当作关键字在绑定的 IFU 文档中检索；\n"
-        "2）先在绑定的 IFU 文档中检索相关内容，不要输出任何多余的文字或解释；\n"
-        "3）用自然语言回答问题，如果有明确页码或章节，顺便在回答中说明；\n"
-        "4）如果文档中找不到相关内容，就明确说“在 eIFU 中未找到相关内容”。"
-    )
     raw = _call_gaia_core(
         text=question,
         system_prompt= "",
