@@ -302,6 +302,7 @@ server {
 - 切换后端地址：
   - 开发环境：`mobile-angular/src/environments/environment.ts`
   - 生产环境：`mobile-angular/src/environments/environment.prod.ts`
+- 如果eIFU是中文， 在GAIA上的system prompt最好用中文描述 + GAIA自动生成的描述
 ## 使用deos vista300 support EAP-TLS?来测试多行
 Structured Output Schema on GAIA
 {
