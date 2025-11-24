@@ -1,0 +1,30 @@
+<view class="help-container">
+  <view class="hero">
+    <text class="hero-title">使用指南</text>
+    <text class="hero-sub">快速了解如何在 eIFU 小助手中查找说明书并向 AI 提问</text>
+  </view>
+
+  <view class="card">
+    <text class="card-title">1. 扫码识别</text>
+    <text class="card-desc">点击首页「扫码」按钮，扫描设备上的二维码或条形码，系统会自动解析型号或文档信息。</text>
+  </view>
+
+  <view class="card">
+    <text class="card-title">2. 关键词搜索</text>
+    <text class="card-desc">在首页输入关键词（如型号、功能点），点击「关键词检索」查看相关文档片段。</text>
+  </view>
+
+  <view class="card">
+    <text class="card-title">3. AI 问答</text>
+    <text class="card-desc">输入自然语言问题，点击「AI 问答」，系统将基于匹配到的说明书内容进行回答。</text>
+  </view>
+
+  <view class="card">
+    <text class="card-title">4. 反馈投票</text>
+    <text class="card-desc">在结果页底部可对本次体验进行投票，帮助我们持续改进。</text>
+  </view>
+
+  <view class="footer">
+    <text class="muted">如需更换后端地址，请在 miniprogram/config.js 中修改 baseUrl。</text>
+  </view>
+</view>

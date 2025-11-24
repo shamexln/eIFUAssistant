@@ -4,7 +4,33 @@ page {
 .container {
   padding: 16rpx 24rpx 120rpx; /* 预留底部投票栏空间 */
 }
+.page { padding: 16rpx 24rpx 120rpx; }
+.hero {
+  background: linear-gradient(135deg, #07C160 0%, #23D170 100%);
+  color: #fff;
+  border-radius: 16rpx;
+  padding: 28rpx;
+}
+.hero .brand { font-size: 40rpx; font-weight: 700; }
+.hero .subtitle { margin-top: 6rpx; opacity: .95; }
+.scan-btn { margin-top: 16rpx; background: #fff; color: #07C160; border: none; }
+
+.search-box { background:#fff; border-radius: 16rpx; padding: 20rpx; margin-top: 20rpx; border: 1px solid #eee; }
+.search-input {
+  background: #f6f7f9;
+  border-radius: 999rpx;
+  padding: 16rpx 24rpx;
+  border: 1px solid #e5e5e5;
+}
+.actions { display: flex; gap: 16rpx; margin-top: 12rpx; }
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16rpx; margin-top: 20rpx; }
+.grid-item { background:#fff; border: 1px solid #eee; border-radius: 16rpx; padding: 20rpx; text-align: center; }
+.gi-title { display:block; font-weight: 600; color:#333; }
+.gi-sub { display:block; color:#888; font-size: 24rpx; margin-top: 6rpx; }
+
 .section { margin-bottom: 24rpx; }
+.section-title { display:block; margin-top: 24rpx; color:#333; font-weight: 600; }
 .label { color: #666; font-size: 26rpx; margin-bottom: 12rpx; display: block; }
 .input {
   background: #fff;
@@ -23,9 +49,9 @@ page {
   border: 1px solid #eee;
 }
 .tip { color: #888; font-size: 24rpx; margin-top: 8rpx; }
-.result-item { background: #fff; padding: 16rpx; border-radius: 12rpx; margin-top: 12rpx; border: 1px solid #eee; }
-.result-item .doc { display: block; font-weight: 600; color: #333; }
-.result-item .snippet {
+.result-card { background: #fff; padding: 16rpx; border-radius: 12rpx; margin-top: 12rpx; border: 1px solid #eee; }
+.result-card .doc { display: block; font-weight: 600; color: #333; }
+.result-card .snippet {
   display: block;
   color: #666;
   margin-top: 6rpx;
@@ -34,14 +60,21 @@ page {
   word-break: break-word;       /* 遇到超长连续字符时强制断行 */
   overflow-wrap: anywhere;      /* 优先在任何位置换行，避免溢出 */
 }
+.result-card .meta { display:flex; gap: 12rpx; margin-top: 8rpx; color:#999; font-size: 24rpx; }
+.result-card .score {}
+.result-card .page {}
+.empty { text-align:center; padding: 24rpx; }
+.muted { color:#999; font-size: 24rpx; }
 .detail-mask { position: fixed; left:0; top:0; right:0; bottom:0; background: rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index: 999; }
 .detail { width: 86vw; max-width: 640rpx; background: #fff; border-radius: 16rpx; padding: 20rpx; }
+.detail-title { font-weight: 600; color:#333; }
 .detail .detail-content {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
   color: #333;
 }
+.close-btn { margin-top: 12rpx; }
 .divider { height: 1px; background: #eaeaea; margin: 24rpx 0; }
 
 /* 底部投票栏 */

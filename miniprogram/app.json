@@ -1,6 +1,7 @@
 {
   "pages": [
-    "pages/index/index"
+    "pages/index/index",
+    "pages/help/index"
   ],
   "subpackages": [
     {
@@ -20,8 +21,24 @@
   "lazyCodeLoading": "requiredComponents",
   "window": {
     "navigationBarTitleText": "eIFU 小助手",
-    "navigationBarBackgroundColor": "#ffffff",
-    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#07C160",
+    "navigationBarTextStyle": "white",
     "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#07C160",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/help/index",
+        "text": "帮助"
+      }
+    ]
   }
 }

@@ -70,7 +70,11 @@ Page({
 
     // 详情浮层（直接展示 snippet，不再请求 /get_content）
     detailContent: '',
-    showDetail: false
+    showDetail: false,
+
+    // 底部投票显示的默认值
+    votes: { up: 0, down: 0 },
+    voteBusy: false
   },
 
   // ===== Gaia demo events =====
