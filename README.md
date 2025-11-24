@@ -340,4 +340,26 @@ Structured Output Schema on GAIA
 },
 "required": ["results"]
 }
+#############
 
+{
+"type": "object",
+"properties": {
+"results": {
+"type": "array",
+"description": "Document search results",
+"items": {
+"type": "object",
+"properties": {
+"doc": { "type": "string", "description": "Source document path or name" },
+"page": { "type": "integer", "description": "Page number in the source document" },
+"refId": { "type": "string", "description": "GAIA refId for citation" },
+"score": { "type": "number", "description": "Relevance score of this hit" },
+"snippet": { "type": "string", "description": "Original text snippet from the document" }
+},
+"required": ["doc", "page", "refId", "snippet"]
+}
+}
+},
+"required": ["results"]
+}

@@ -223,7 +223,8 @@ from urllib.parse import unquote
 _IFU_MAP = {
     "Vista 300": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
     "Vista 120": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"},
-    "Atlan 100": {"assistantid":"45bcc1e2-79f6-46bf-94fc-3e5c94168ee7","containerid":"e05d7522-891a-416a-8bed-cbefc0c64209"},
+    "Atlan 100": {"assistantid":"7498650d-ad0c-45b9-9e2e-0b2ecece5a9f","containerid":"e05d7522-891a-416a-8bed-cbefc0c64209"},
+    #"Atlan 100": {"assistantid":"45bcc1e2-79f6-46bf-94fc-3e5c94168ee7","containerid":"e05d7522-891a-416a-8bed-cbefc0c64209"},
     "Epic": {"assistantid":"fab9226e-cb6b-4ced-9310-e3560804e675","containerid":"41f4f2b3-4ae1-42f3-b824-b7430ffb45c5"}
 }
 
