@@ -42,6 +42,43 @@ function parseScanText(text) {
   return { model, assistantid, containerid }
 }
 
+// 统一的错误提示：引导用户查看“帮助”或稍后再试
+function showErrorSuggestHelp(title, detail) {
+  const t = title || '请求失败'
+  const c = (detail ? String(detail) + '\n\n' : '') + '请稍后再试，或前往“帮助”查看常见问题。'
+  try {
+    wx.showModal({
+      title: t,
+      content: c,
+      showCancel: true,
+      cancelText: '稍后再试',
+      confirmText: '查看帮助',
+      success: (r) => {
+        if (r && r.confirm) {
+          // 跳转到帮助页
+          wx.navigateTo({ url: '/pages/help/index' })
+        }
+      }
+    })
+  } catch (e) {
+    // 回退到 toast
+    wx.showToast({ title: t, icon: 'none' })
+  }
+}
+
+function handleRequestFail(err, context) {
+  const em = (err && err.errMsg) || ''
+  const isTimeout = /timeout/i.test(em)
+  const detail = isTimeout ? '请求超时' : (em || '网络异常')
+  showErrorSuggestHelp(context || '服务不可用', detail)
+  console.error('[request fail]', context, err)
+}
+
+function handleHttpNon2xx(res, context) {
+  const msg = (res && res.data && (res.data.detail || res.data.message)) || `错误 ${res && res.statusCode}`
+  showErrorSuggestHelp(context || '请求失败', msg)
+}
+
 // 格式化文档标题：移除前缀的 containerid（UUID 形式），例如：
 // "e05d7522-891a-416a-8bed-cbefc0c64209_A1xx_..." => "A1xx_..."
 function formatDoc(doc) {
@@ -110,18 +147,17 @@ Page({
       method: 'POST',
       header: { 'content-type': 'application/json' },
       data: payload,
+      timeout: 15000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const content = res.data.content || ''
           this.setData({ response: content })
         } else {
-          const msg = (res.data && (res.data.detail || res.data.message)) || `错误 ${res.statusCode}`
-          wx.showToast({ title: String(msg), icon: 'none' })
+          handleHttpNon2xx(res, 'Gaia 服务')
         }
       },
       fail: (err) => {
-        wx.showToast({ title: '网络错误，请检查后端地址', icon: 'none' })
-        console.error('request fail', err)
+        handleRequestFail(err, 'Gaia 服务')
       },
       complete: () => {
         this.setData({ loading: false })
@@ -148,17 +184,22 @@ Page({
           wx.request({
             url: `${baseUrl}/api/get_ifu?model=${encodeURIComponent(model)}`,
             method: 'GET',
+            timeout: 15000,
             success: (ret) => {
-              const a = (ret.data && ret.data.assistantid) || ''
-              const c = (ret.data && ret.data.containerid) || ''
-              this.setData({ assistantid: a, containerid: c })
-              if (a && c) {
-                wx.showToast({ title: '已定位说明书', icon: 'success' })
+              if (ret.statusCode >= 200 && ret.statusCode < 300) {
+                const a = (ret.data && ret.data.assistantid) || ''
+                const c = (ret.data && ret.data.containerid) || ''
+                this.setData({ assistantid: a, containerid: c })
+                if (a && c) {
+                  wx.showToast({ title: '已定位说明书', icon: 'success' })
+                } else {
+                  wx.showToast({ title: '未找到匹配说明书', icon: 'none' })
+                }
               } else {
-                wx.showToast({ title: '未找到匹配说明书', icon: 'none' })
+                handleHttpNon2xx(ret, '定位说明书')
               }
             },
-            fail: () => wx.showToast({ title: '请求失败', icon: 'none' }),
+            fail: (e) => handleRequestFail(e, '定位说明书'),
             complete: () => {
               try { wx.hideLoading() } catch (e) {}
             }
@@ -196,19 +237,24 @@ Page({
     wx.request({
       url,
       method: 'GET',
+      timeout: 15000,
       success: (res) => {
-        const raw = (res.data && res.data.results) || []
-        const results = raw.map(r => ({
-          ...r,
-          docDisplay: formatDoc(r && r.doc)
-        }))
-        this.setData({ results })
-        if (!results.length) {
-          const emptyMsg = mode === 'ask' ? 'AI 暂无答案' : '未找到相关内容'
-          wx.showToast({ title: emptyMsg, icon: 'none' })
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          const raw = (res.data && res.data.results) || []
+          const results = raw.map(r => ({
+            ...r,
+            docDisplay: formatDoc(r && r.doc)
+          }))
+          this.setData({ results })
+          if (!results.length) {
+            const emptyMsg = mode === 'ask' ? 'AI 暂无答案' : '未找到相关内容'
+            wx.showToast({ title: emptyMsg, icon: 'none' })
+          }
+        } else {
+          handleHttpNon2xx(res, mode === 'ask' ? 'AI 提问' : 'IFU 搜索')
         }
       },
-      fail: () => wx.showToast({ title: (mode === 'ask' ? '提问失败' : '搜索失败'), icon: 'none' }),
+      fail: (e) => handleRequestFail(e, mode === 'ask' ? 'AI 提问' : 'IFU 搜索'),
       complete: () => {
         try { wx.hideLoading() } catch (e) {}
       }
@@ -349,12 +395,19 @@ Page({
     wx.request({
       url: `${baseUrl}/api/vote`,
       method: 'GET',
+      timeout: 10000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const up = Number(res.data.up || 0)
           const down = Number(res.data.down || 0)
           this.setData({ votes: { up, down } })
+        } else {
+          // 投票统计失败不打断用户，但仍输出日志
+          console.warn('获取投票统计失败', res)
         }
+      },
+      fail: (e) => {
+        console.warn('获取投票统计网络异常', e)
       }
     })
   },
@@ -370,16 +423,17 @@ Page({
       method: 'POST',
       header: { 'content-type': 'application/json' },
       data: { type },
+      timeout: 10000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const up = Number(res.data.up || 0)
           const down = Number(res.data.down || 0)
           this.setData({ votes: { up, down } })
         } else {
-          wx.showToast({ title: '投票失败', icon: 'none' })
+          handleHttpNon2xx(res, '投票')
         }
       },
-      fail: () => wx.showToast({ title: '网络错误', icon: 'none' }),
+      fail: (e) => handleRequestFail(e, '投票'),
       complete: () => this.setData({ voteBusy: false })
     })
   },

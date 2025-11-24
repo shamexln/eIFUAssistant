@@ -23,7 +23,7 @@
              value="{{keyword}}"
              bindinput="onKeywordInput" />
       <view class="mic-btn {{recording ? 'recording' : ''}}"
-            bindtouchstart="startVoice"
+            bindlongpress="startVoice"
             bindtouchend="stopVoice"
             bindtouchcancel="cancelVoice"
             hover-class="mic-btn-hover">
