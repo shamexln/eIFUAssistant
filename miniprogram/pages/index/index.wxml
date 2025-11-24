@@ -2,17 +2,26 @@
   <!-- A: 扫码页面 -->
   <view class="section">
     <button class="btn" type="primary" bindtap="onScan">扫码定位设备说明书</button>
-    <view class="tip">原始二维码：{{scanRawText || '—'}}</view>
-    <view class="tip">型号：{{model || '—'}}</view>
+    <!-- 醒目提示：当前查询的设备型号（仅当已识别到型号时显示） -->
+    <view class="model-banner" wx:if="{{model}}">
+      <text class="model-badge">📌 当前型号</text>
+      <text class="model-text">{{model}}</text>
+    </view>
+   <!-- <view class="tip">原始二维码：{{scanRawText || '—'}}</view>
     <view class="tip">assistantid：{{assistantid || '—'}}</view>
-    <view class="tip">containerid：{{containerid || '—'}}</view>
+    <view class="tip">containerid：{{containerid || '—'}}</view>-->
+    <view class="tip" wx:if="{{!model}}">型号：{{model || '—'}}</view>
   </view>
 
   <!-- B: 关键词搜索 -->
   <view class="section">
     <text class="label">关键词搜索</text>
     <view class="input-row">
-      <input class="input flex" placeholder="请输入关键词（可按住右侧小喇叭语音输入）" value="{{keyword}}" bindinput="onKeywordInput" />
+      <input class="input flex"
+             placeholder="请输入关键词（可按住右侧小喇叭语音输入）"
+             placeholder-class="placeholder"
+             value="{{keyword}}"
+             bindinput="onKeywordInput" />
       <view class="mic-btn {{recording ? 'recording' : ''}}"
             bindtouchstart="startVoice"
             bindtouchend="stopVoice"

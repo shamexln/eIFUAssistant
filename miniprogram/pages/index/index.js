@@ -51,6 +51,9 @@ function formatDoc(doc) {
   return s.replace(m, '')
 }
 
+// 语音识别（WechatSI 插件）
+let _siManager = null
+
 Page({
   data: {
     // Gaia demo
@@ -74,7 +77,11 @@ Page({
 
     // 底部投票显示的默认值
     votes: { up: 0, down: 0 },
-    voteBusy: false
+    voteBusy: false,
+
+    // 语音输入
+    recording: false,
+    voiceSupported: false
   },
 
   // ===== Gaia demo events =====
@@ -233,6 +240,110 @@ Page({
     wx.navigateTo({ url: '/packageA/pages/demo/index' })
   },
 
+  // ===== 语音输入（按住说话） =====
+  initVoice() {
+    try {
+      const si = requirePlugin && requirePlugin('WechatSI')
+      if (!si || !si.getRecordRecognitionManager) {
+        this.setData({ voiceSupported: false })
+        return
+      }
+      _siManager = si.getRecordRecognitionManager()
+      if (!_siManager) {
+        this.setData({ voiceSupported: false })
+        return
+      }
+
+      this.setData({ voiceSupported: true })
+
+      _siManager.onStart = () => {
+        // 已开始录音
+      }
+
+      _siManager.onRecognize = (res) => {
+        // 实时结果（部分机型/版本支持）
+        const t = (res && (res.result || res.result || res.msg)) || ''
+        if (t) this.setData({ keyword: t })
+      }
+
+      _siManager.onStop = (res) => {
+        const text = (res && res.result) || ''
+        if (!this._voiceCancelled && text) {
+          this.setData({ keyword: text })
+        }
+        this._voiceCancelled = false
+        this.setData({ recording: false })
+      }
+
+      _siManager.onError = (err) => {
+        this.setData({ recording: false })
+        wx.showToast({ title: '语音识别失败', icon: 'none' })
+        console.error('WechatSI error', err)
+      }
+    } catch (e) {
+      this.setData({ voiceSupported: false })
+      console.warn('WechatSI 初始化失败', e)
+    }
+  },
+
+  _ensureRecordAuth(cb) {
+    wx.getSetting({
+      success: (st) => {
+        const authed = st && st.authSetting && st.authSetting['scope.record']
+        if (authed) {
+          cb && cb()
+        } else {
+          wx.authorize({
+            scope: 'scope.record',
+            success: () => cb && cb(),
+            fail: () => {
+              wx.showModal({
+                title: '需要麦克风权限',
+                content: '请在设置中允许使用麦克风以启用语音输入',
+                confirmText: '去设置',
+                success: (r) => {
+                  if (r.confirm) wx.openSetting({})
+                }
+              })
+            }
+          })
+        }
+      },
+      fail: () => cb && cb()
+    })
+  },
+
+  startVoice() {
+    if (!this.data.voiceSupported || !_siManager) {
+      wx.showToast({ title: '当前环境不支持语音', icon: 'none' })
+      return
+    }
+    this._ensureRecordAuth(() => {
+      try {
+        this._voiceCancelled = false
+        this.setData({ recording: true })
+        _siManager.start({ lang: 'zh_CN' })
+      } catch (e) {
+        this.setData({ recording: false })
+        wx.showToast({ title: '启动录音失败', icon: 'none' })
+      }
+    })
+  },
+
+  stopVoice() {
+    if (!this.data.recording || !_siManager) return
+    try { _siManager.stop() } catch (e) {
+      this.setData({ recording: false })
+    }
+  },
+
+  cancelVoice() {
+    this._voiceCancelled = true
+    if (this.data.recording && _siManager) {
+      try { _siManager.stop() } catch (e) {}
+    }
+  },
+
   // ===== 投票功能 =====
   fetchVotes() {
     wx.request({
@@ -271,6 +382,11 @@ Page({
       fail: () => wx.showToast({ title: '网络错误', icon: 'none' }),
       complete: () => this.setData({ voteBusy: false })
     })
+  },
+
+  onLoad() {
+    // 初始化语音
+    this.initVoice()
   },
 
   onShow() {
