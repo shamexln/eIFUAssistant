@@ -66,6 +66,17 @@ function showErrorSuggestHelp(title, detail) {
   }
 }
 
+// 统一的成功提示：简洁地告诉用户操作已完成
+function showSuccess(title) {
+  const t = title || '已完成'
+  try {
+    wx.showToast({ title: t, icon: 'success' })
+  } catch (e) {
+    // 降级为无图标 toast
+    wx.showToast({ title: t, icon: 'none' })
+  }
+}
+
 function handleRequestFail(err, context) {
   const em = (err && err.errMsg) || ''
   const isTimeout = /timeout/i.test(em)
@@ -152,6 +163,8 @@ Page({
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const content = res.data.content || ''
           this.setData({ response: content })
+          // 成功提示：告知用户已拿到回复
+          showSuccess('已获取回复')
         } else {
           handleHttpNon2xx(res, 'Gaia 服务')
         }
@@ -249,6 +262,9 @@ Page({
           if (!results.length) {
             const emptyMsg = mode === 'ask' ? 'AI 暂无答案' : '未找到相关内容'
             wx.showToast({ title: emptyMsg, icon: 'none' })
+          } else {
+            // 成功提示：有结果时提示成功
+            showSuccess(mode === 'ask' ? '已获取AI答案' : '找到相关内容')
           }
         } else {
           handleHttpNon2xx(res, mode === 'ask' ? 'AI 提问' : 'IFU 搜索')
@@ -429,6 +445,8 @@ Page({
           const up = Number(res.data.up || 0)
           const down = Number(res.data.down || 0)
           this.setData({ votes: { up, down } })
+          // 成功提示：投票已生效
+          showSuccess('投票成功')
         } else {
           handleHttpNon2xx(res, '投票')
         }

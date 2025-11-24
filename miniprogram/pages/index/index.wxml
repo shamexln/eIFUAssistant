@@ -7,9 +7,9 @@
       <text class="model-badge">📌 当前型号</text>
       <text class="model-text">{{model}}</text>
     </view>
-   <!-- <view class="tip">原始二维码：{{scanRawText || '—'}}</view>
+    <view class="tip">原始二维码：{{scanRawText || '—'}}</view>
     <view class="tip">assistantid：{{assistantid || '—'}}</view>
-    <view class="tip">containerid：{{containerid || '—'}}</view>-->
+    <view class="tip">containerid：{{containerid || '—'}}</view>
     <view class="tip" wx:if="{{!model}}">型号：{{model || '—'}}</view>
   </view>
 

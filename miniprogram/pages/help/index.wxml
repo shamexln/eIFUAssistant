@@ -25,6 +25,8 @@
   </view>
 
   <view class="footer">
-    <text class="muted">如需更换后端地址，请在 miniprogram/config.js 中修改 baseUrl。</text>
+   <!-- <text class="muted">如需更换后端地址，请在 miniprogram/config.js 中修改 baseUrl。</text>-->
+    <view style="height: 6px" />
+    <text class="muted">当前版本：{{version || '未知'}}</text>
   </view>
 </view>
