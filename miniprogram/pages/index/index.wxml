@@ -4,13 +4,13 @@
     <button class="btn" type="primary" bindtap="onScan">扫码定位设备说明书</button>
     <!-- 醒目提示：当前查询的设备型号（仅当已识别到型号时显示） -->
     <view class="model-banner" wx:if="{{model}}">
-      <text class="model-badge">📌 当前型号</text>
+      <image class="type-icon" wx:if="{{typeIcon}}" src="{{typeIcon}}" mode="aspectFit"></image>
       <text class="model-text">{{model}}</text>
     </view>
-    <view class="tip">原始二维码：{{scanRawText || '—'}}</view>
+    <!--<view class="tip">原始二维码：{{scanRawText || '—'}}</view>
     <view class="tip">assistantid：{{assistantid || '—'}}</view>
     <view class="tip">containerid：{{containerid || '—'}}</view>
-    <view class="tip" wx:if="{{!model}}">型号：{{model || '—'}}</view>
+    <view class="tip" wx:if="{{!model}}">型号：{{model || '—'}}</view>-->
   </view>
 
   <!-- B: 关键词搜索 -->

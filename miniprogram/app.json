@@ -21,13 +21,13 @@
   "lazyCodeLoading": "requiredComponents",
   "window": {
     "navigationBarTitleText": "eIFU 小助手",
-    "navigationBarBackgroundColor": "#07C160",
+    "navigationBarBackgroundColor": "#0F2A44", 
     "navigationBarTextStyle": "white",
     "backgroundTextStyle": "light"
   },
   "tabBar": {
     "color": "#666666",
-    "selectedColor": "#07C160",
+    "selectedColor": "#0F2A44",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [

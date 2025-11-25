@@ -5,8 +5,9 @@ function parseScanText(text) {
   let model = ''
   let assistantid = ''
   let containerid = ''
+  let type = ''
 
-  if (!text || typeof text !== 'string') return { model, assistantid, containerid }
+  if (!text || typeof text !== 'string') return { model, assistantid, containerid, type }
 
   // 1) 尝试 JSON
   try {
@@ -15,19 +16,22 @@ function parseScanText(text) {
       assistantid = String(obj.ifu_path || obj.doc_path || obj.assistantid || '').trim()
       containerid = String(obj.containerid || '').trim()
       model = String(obj.model || '').trim()
+      type = String(obj.type || obj.deviceType || '').trim()
     }
   } catch (e) {
     // ignore
   }
 
   // 2) URL/参数提取
-  if (!model || !assistantid) {
+  if (!model || !assistantid || !type) {
     const urlMatch = /model=([^&]+)/i.exec(text)
     const docMatch = /(?:ifu_path|doc_path|assistantid)=([^&]+)/i.exec(text)
     const containerMatch = /(?:containerid)=([^&]+)/i.exec(text)
+    const typeMatch = /(?:type|deviceType)=([^&]+)/i.exec(text)
     if (!assistantid && docMatch) assistantid = decodeURIComponent(docMatch[1])
     if (!containerid && containerMatch) containerid = decodeURIComponent(containerMatch[1])
     if (!model && urlMatch) model = decodeURIComponent(urlMatch[1])
+    if (!type && typeMatch) type = decodeURIComponent(typeMatch[1])
   }
 
   // 3) 纯文本：判断像路径还是型号
@@ -39,7 +43,7 @@ function parseScanText(text) {
     }
   }
 
-  return { model, assistantid, containerid }
+  return { model, assistantid, containerid, type }
 }
 
 // 统一的错误提示：引导用户查看“帮助”或稍后再试
@@ -99,6 +103,27 @@ function formatDoc(doc) {
   return s.replace(m, '')
 }
 
+// 根据设备类型选择图标：为兼容小程序，优先使用 webp 资源
+function getTypeIcon(type) {
+  const t = String(type || '').toLowerCase()
+  // 目前项目提供了 webp 与 svg 两种格式，选择 webp 更适配微信小程序
+  const base = '../../icon/default.png'
+  const anes = '../../icon/anes.png'
+  const vent = '../../icon/vent.png'
+  const vista = '../../icon/vista.png'
+  // 暂无更多类型区分时，均返回相同设备图标；后续可在此扩展映射
+  switch (t) {
+    case 'anes':
+      return anes
+    case 'vent':
+      return vent
+    case 'monitor':
+      return vista
+    default:
+      return base
+  }
+}
+
 // 语音识别（WechatSI 插件）
 let _siManager = null
 
@@ -115,6 +140,8 @@ Page({
     model: '',
     assistantid: '',
     containerid: '',
+    type: '',
+    typeIcon: '',
 
     keyword: '',
     results: [],
@@ -158,7 +185,7 @@ Page({
       method: 'POST',
       header: { 'content-type': 'application/json' },
       data: payload,
-      timeout: 15000,
+      timeout: 35000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const content = res.data.content || ''
@@ -188,8 +215,9 @@ Page({
           wx.showToast({ title: '未识别到二维码内容', icon: 'none' })
           return
         }
-        const { model, assistantid, containerid } = parseScanText(raw)
-        this.setData({ scanRawText: raw, model, assistantid, containerid })
+        const { model, assistantid, containerid, type } = parseScanText(raw)
+        const typeIcon = type ? getTypeIcon(type) : ''
+        this.setData({ scanRawText: raw, model, assistantid, containerid, type, typeIcon })
 
         // 若只有型号没有 assistantid，调用后端进行定位
         if (model && !assistantid) {
@@ -197,7 +225,7 @@ Page({
           wx.request({
             url: `${baseUrl}/api/get_ifu?model=${encodeURIComponent(model)}`,
             method: 'GET',
-            timeout: 15000,
+            timeout: 35000,
             success: (ret) => {
               if (ret.statusCode >= 200 && ret.statusCode < 300) {
                 const a = (ret.data && ret.data.assistantid) || ''
@@ -250,7 +278,7 @@ Page({
     wx.request({
       url,
       method: 'GET',
-      timeout: 15000,
+      timeout: 35000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           const raw = (res.data && res.data.results) || []
@@ -411,7 +439,7 @@ Page({
     wx.request({
       url: `${baseUrl}/api/vote`,
       method: 'GET',
-      timeout: 10000,
+      timeout: 20000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const up = Number(res.data.up || 0)
@@ -439,7 +467,7 @@ Page({
       method: 'POST',
       header: { 'content-type': 'application/json' },
       data: { type },
-      timeout: 10000,
+      timeout: 20000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const up = Number(res.data.up || 0)

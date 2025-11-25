@@ -1,28 +1,32 @@
+/* 全局页面背景：保持简洁白底，贴近截图风格 */
 page {
-  background: #f7f7f7;
+  background: #ffffff;
 }
 .container {
   padding: 16rpx 24rpx 120rpx; /* 预留底部投票栏空间 */
 }
 .page { padding: 16rpx 24rpx 120rpx; }
+/* 头部强调区域：由绿色改为深蓝系 */
 .hero {
-  background: linear-gradient(135deg, #07C160 0%, #23D170 100%);
+  background: linear-gradient(135deg, #0F2A44 0%, #143754 100%);
   color: #fff;
   border-radius: 16rpx;
   padding: 28rpx;
 }
 .hero .brand { font-size: 40rpx; font-weight: 700; }
-.hero .subtitle { margin-top: 6rpx; opacity: .95; }
-.scan-btn { margin-top: 16rpx; background: #fff; color: #07C160; border: none; }
+.hero .subtitle { margin-top: 6rpx; opacity: .95; font-size: 28rpx; }
+.scan-btn { margin-top: 16rpx; background: #fff; color: #0F2A44; border: none; }
 
 .search-box { background:#fff; border-radius: 16rpx; padding: 20rpx; margin-top: 20rpx; border: 1px solid #eee; }
 .input-row { display: flex; align-items: center; gap: 16rpx; }
 .flex { flex: 1; min-width: 0; }
+/* 输入框：浅蓝底、细边，更接近截图 */
 .search-input {
-  background: #f6f7f9;
-  border-radius: 999rpx;
+  background: #EDF3FF;           /* 浅蓝底 */
+  border-radius: 12rpx;           /* 更像卡片圆角 */
   padding: 16rpx 24rpx;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #CFE0FF;      /* 淡蓝边 */
+  color: #0F2A44;
 }
 .actions { display: flex; gap: 16rpx; margin-top: 12rpx; }
 
@@ -32,16 +36,16 @@ page {
   height: 72rpx;
   line-height: 72rpx;
   border-radius: 999rpx;
-  background: #f6f7f9;
-  color: #333;
-  border: 1px solid #e5e5e5;
+  background: #EDF3FF;
+  color: #0F2A44;
+  border: 1px solid #CFE0FF;
   white-space: nowrap;
 }
-.mic-btn-hover { background: #eceef1; }
+.mic-btn-hover { background: #E6EEFF; }
 .mic-btn.recording {
-  border-color: #07C160;
-  color: #07C160;
-  background: #e6f8ee;
+  border-color: #0F2A44;
+  color: #0F2A44;
+  background: #E6EEFF;
 }
 .voice-tip { color: #888; font-size: 24rpx; margin: 8rpx 0 0 8rpx; }
 
@@ -58,15 +62,21 @@ page {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  background: var(--odx-c-selected, #e6f8ff);
-  color: var(--odx-c-text, #333);
-  border: 1px solid var(--odx-c-separator, #e5e5e5);
+  /* 清理未定义的 CSS 变量，采用明确配色（浅蓝背景 + 细边） */
+  background: #EAF6FF;
+  color: #0F2A44;
+  border: 1px solid #E5EAF2;
   padding: 16rpx 20rpx;
   border-radius: 12rpx;
 }
+.type-icon {
+  width: 40rpx;
+  height: 40rpx;
+  display: block;
+}
 .model-badge {
-  background: var(--odx-c-highlight, #07C160);
-  color: var(--odx-c-highlight-text, #fff);
+  background: #0F2A44;
+  color: #ffffff;
   border-radius: 999rpx;
   padding: 6rpx 16rpx;
   font-size: 24rpx;
@@ -75,7 +85,7 @@ page {
 .model-text {
   font-weight: 700;
   font-size: 28rpx;
-  color: var(--odx-c-text, #333);
+  color: #0F2A44;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -97,7 +107,35 @@ page {
   text-overflow: ellipsis;   /* 尾部省略号 */
   overflow: hidden;          /* 必需配合 ellipsis 使用 */
 }
-.btn { margin-top: 12rpx; }
+/* 主按钮：深蓝底白字，圆角更明显 */
+.btn {
+  margin-top: 12rpx;
+  background: #002766;
+  color: #ffffff;
+  border: none;
+  border-radius: 12rpx;
+  height: 84rpx;
+  line-height: 84rpx;
+  font-weight: 600;
+  box-shadow: 0 4rpx 10rpx rgba(15, 42, 68, 0.18);
+}
+/* 覆盖微信原生按钮的 1px 外边框 */
+button::after, .btn::after, .vote-btn::after, .mic-btn::after { border: none; }
+/* 提升优先级，确保 type=primary 应用深蓝主色 */
+button[type=primary].btn {
+  background: #002766;
+  color: #ffffff;
+}
+/* 可选的默认按钮（无 type 或 default）同样使用深蓝主题 */
+button[type=default].btn, button.btn {
+  background: #002766;
+  color: #ffffff;
+}
+.btn:active { background: #0C263A; box-shadow: 0 2rpx 6rpx rgba(12, 38, 58, 0.18); }
+.btn[disabled] {
+  opacity: .55;
+  box-shadow: none;
+}
 .output {
   white-space: pre-wrap;
   background: #fff;
@@ -125,7 +163,7 @@ page {
 .muted { color:#999; font-size: 24rpx; }
 .detail-mask { position: fixed; left:0; top:0; right:0; bottom:0; background: rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index: 999; }
 .detail { width: 86vw; max-width: 640rpx; background: #fff; border-radius: 16rpx; padding: 20rpx; }
-.detail-title { font-weight: 600; color:#333; }
+.detail-title { font-weight: 600; color:#333; font-size: 28rpx; }
 .detail .detail-content {
   white-space: pre-wrap;
   word-break: break-word;
@@ -149,10 +187,12 @@ page {
 }
 .vote-btn {
   flex: 1;
-  background: #f6f7f9;
-  color: #333;
-  border: 1px solid #e5e5e5;
+  background: #F3F6FA;
+  color: #10304A;
+  border: 1px solid #D5DEEA;
   border-radius: 999rpx;
 }
-.vote-btn.up { border-color: #34c759; color: #1e8f46; }
-.vote-btn.down { border-color: #ff3b30; color: #b32623; }
+.vote-btn:active { background: #EAF1FB; }
+/* 喜欢/不喜欢：与首页/帮助页一致的低饱和深蓝文字与淡边，避免过于显著 */
+.vote-btn.up { border-color: #D5DEEA; color: #10304A; }
+.vote-btn.down { border-color: #D5DEEA; color: #10304A; }

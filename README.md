@@ -17,7 +17,8 @@ miniprogram/            # 小程序代码
   config.js             # 后端 baseUrl 配置（请改为你自己的后端地址）
   pages/index/*         # 主页：输入、发送、显示结果
 ```
-
+## 二维码
+{"model":"Atlan 100","type":"Anes"}
 ## 后端运行
 
 1. 准备 Python 3.10+ 环境。
